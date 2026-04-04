@@ -14,11 +14,6 @@ const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABA
 
 const app = express();
 
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
