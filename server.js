@@ -507,6 +507,75 @@ app.delete('/admin/users/:id', requireAdmin, async (req, res) => {
     }
 });
 
+app.get('/verified', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Verification Successful</title>
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+            <style>
+                body { 
+                    font-family: 'Poppins', sans-serif; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    height: 100vh; 
+                    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); 
+                    margin: 0; 
+                }
+                .card { 
+                    background: white; 
+                    padding: 3rem; 
+                    border-radius: 16px; 
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
+                    text-align: center;
+                    max-width: 400px;
+                }
+                .icon { 
+                    background: linear-gradient(135deg, #10b981, #34d399);
+                    color: white; 
+                    width: 80px; 
+                    height: 80px; 
+                    border-radius: 50%; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    font-size: 2.5rem; 
+                    margin: 0 auto 1.5rem; 
+                }
+                h2 { color: #0f172a; margin-bottom: 0.5rem; }
+                p { color: #64748b; margin-bottom: 2rem; }
+                a { 
+                    display: inline-block; 
+                    padding: 12px 24px; 
+                    background: linear-gradient(135deg, #1e3a8a, #1e40af); 
+                    color: white; 
+                    text-decoration: none; 
+                    border-radius: 50px; 
+                    font-weight: 600;
+                    transition: transform 0.3s ease, box-shadow 0.3s ease;
+                }
+                a:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 20px rgba(30, 58, 138, 0.3);
+                }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="icon">✓</div>
+                <h2>Verification Successful!</h2>
+                <p>Your student email has been successfully verified.</p>
+                <a href="/login">Return to Login</a>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 3000;
