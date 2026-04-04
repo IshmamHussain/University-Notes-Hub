@@ -6,6 +6,14 @@ const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+    console.error("Missing SUPABASE env vars. Ensure .env is populated.");
+}
+const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABASE_SERVICE_KEY || "");
+
 const app = express();
 
 // --- SQLite setup ---
@@ -13,14 +21,14 @@ const DB_PATH = path.join(__dirname, 'university_notes_hub.db');
 let dbInstance = null;
 
 async function getDb() {
-  if (dbInstance) return dbInstance;
-  dbInstance = await open({
-    filename: DB_PATH,
-    driver: sqlite3.Database
-  });
-  await dbInstance.exec('PRAGMA journal_mode = WAL');
-  await dbInstance.exec('PRAGMA foreign_keys = ON');
-  return dbInstance;
+    if (dbInstance) return dbInstance;
+    dbInstance = await open({
+        filename: DB_PATH,
+        driver: sqlite3.Database
+    });
+    await dbInstance.exec('PRAGMA journal_mode = WAL');
+    await dbInstance.exec('PRAGMA foreign_keys = ON');
+    return dbInstance;
 }
 
 // Helper: run a SELECT and return all rows
@@ -65,7 +73,7 @@ app.use(session({
     secret: 'university-notes-secret-key-change-this-in-production',
     resave: true,
     saveUninitialized: true,
-    cookie: { 
+    cookie: {
         secure: false,
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
@@ -130,7 +138,7 @@ const requireAdmin = (req, res, next) => {
     console.log('🔐 Admin check for:', req.path);
     console.log('   User:', req.session.user ? req.session.user.username : 'No user');
     console.log('   Role:', req.session.user ? req.session.user.role : 'No role');
-    
+
     if (req.session.user && req.session.user.role === 'admin') {
         console.log('✅ Admin access granted');
         next();
@@ -175,85 +183,81 @@ app.get('/admin/test', requireAdmin, (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-    const { username, password } = req.body;
-    
-    console.log('🔐 Login attempt:', username);
-    
-    try {
-        const users = await dbAll('SELECT * FROM users WHERE username = ?', [username]);
+    const { username: email, password } = req.body; // HTML sends 'username' field but it's an email now
 
-        if (users.length === 0) {
-            console.log('❌ User not found:', username);
-            return res.status(401).json({ error: 'Invalid username or password' });
+    console.log('🔐 Login attempt via Supabase Auth:', email);
+
+    try {
+        // Special bypass for built-in admin if needed
+        if (email === 'admin' && password === 'admin123') {
+            const users = await dbAll('SELECT * FROM users WHERE username = \'admin\'');
+            if (users.length > 0) {
+                req.session.user = { id: users[0].id, username: users[0].username, role: users[0].role };
+                return req.session.save(() => res.json({ success: true, user: req.session.user }));
+            }
         }
 
-        const user = users[0];
-        
-        const validPassword = (user.password === password) || 
-                             (user.username === 'admin' && password === 'admin123');
-        
-        if (!validPassword) {
-            console.log('❌ Invalid password for user:', username);
-            return res.status(401).json({ error: 'Invalid username or password' });
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (authError) {
+            return res.status(401).json({ error: authError.message });
+        }
+
+        // Auth successful, email is confirmed (Supabase enforces this automatically by default)
+        // Fetch custom user data
+        const users = await dbAll('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(401).json({ error: 'User metadata not found in database' });
         }
 
         req.session.user = {
-            id: user.id,
-            username: user.username,
-            role: user.role
+            id: users[0].id,
+            username: users[0].username,
+            role: users[0].role
         };
 
         req.session.save((err) => {
-            if (err) {
-                console.error('❌ Session save error:', err);
-                return res.status(500).json({ error: 'Login failed' });
-            }
-            
-            console.log('✅ Login successful:', username, 'Role:', user.role);
+            if (err) throw err;
+            console.log('✅ Login successful:', email, 'Role:', users[0].role);
             res.json({ success: true, user: req.session.user });
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Server error: ' + error.message, stack: error.stack });
     }
 });
 
 app.post('/register', async (req, res) => {
-    const { username, email, student_id, department, batch, password, confirmPassword } = req.body;
+    const { username, email, department, password, confirmPassword } = req.body;
 
     if (password !== confirmPassword) {
         return res.status(400).json({ error: 'Passwords do not match' });
     }
 
-    const studentIdRegex = /^\d{3}-\d{3}-\d{3}$/;
-    if (!studentIdRegex.test(student_id)) {
-        return res.status(400).json({ error: 'Student ID must be in format: XXX-XXX-XXX (e.g., 123-456-789)' });
-    }
-
-    if (!batch || batch < 1 || batch > 999) {
-        return res.status(400).json({ error: 'Please enter a valid batch number (1-999)' });
-    }
-
-    if (!department) {
-        return res.status(400).json({ error: 'Please select a department' });
-    }
-
     try {
-        const existingUsers = await dbAll(
-            'SELECT id FROM users WHERE username = ? OR email = ? OR student_id = ?',
-            [username, email, student_id]
-        );
+        console.log('📝 Registering user in Supabase Auth:', email);
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+        });
 
-        if (existingUsers.length > 0) {
-            return res.status(400).json({ error: 'Username, email, or student ID already exists' });
+        if (authError) {
+            return res.status(400).json({ error: authError.message });
         }
 
+        // Hash the password to satisfy the SQLite NOT NULL constraint securely
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Insert metadata into our custom 'users' table, now including the password
         await dbRun(
-            'INSERT INTO users (username, email, student_id, department, batch, password, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [username, email, student_id, department, batch, password, 'user']
+            'INSERT INTO users (username, email, department, password, role) VALUES (?, ?, ?, ?, ?)',
+            [username, email, department || null, hashedPassword, 'user']
         );
 
-        res.json({ success: true, message: 'Registration successful' });
+        res.json({ success: true, message: 'Registration successful! Please check your email to verify your account.' });
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ error: 'Registration failed: ' + error.message });
@@ -299,150 +303,27 @@ app.get('/department/:id', async (req, res) => {
         }
 
         const courses = await dbAll(`
-            SELECT 
-                c.*,
-                (SELECT COUNT(*) FROM notes WHERE course_id = c.id AND status = 'approved') as notes_count
+            SELECT c.*,
+                   (SELECT COUNT(*) FROM notes WHERE course_id = c.id AND status = 'approved') as notes_count
             FROM courses c
             WHERE c.department_id = ?
-            ORDER BY c.name
         `, [req.params.id]);
 
         res.json({ department: departments[0], courses });
     } catch (error) {
         console.error('Department error:', error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-app.get('/courses', async (req, res) => {
-    try {
-        const courses = await dbAll(`
-            SELECT 
-                c.*, 
-                d.name as department_name,
-                (SELECT COUNT(*) FROM notes WHERE course_id = c.id AND status = 'approved') as notes_count
-            FROM courses c 
-            JOIN departments d ON c.department_id = d.id 
-            ORDER BY d.name, c.name
-        `);
-        res.json(courses);
-    } catch (error) {
-        console.error('Courses error:', error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-
-app.get('/admin/users', requireAdmin, async (req, res) => {
-    try {
-        const users = await dbAll(`
-            SELECT 
-                id, username, email, student_id, department, batch, role, created_at
-            FROM users 
-            ORDER BY created_at DESC
-        `);
-
-        for (let user of users) {
-            const noteCounts = await dbGet(`
-                SELECT 
-                    COUNT(*) as total_notes,
-                    SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_notes,
-                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_notes,
-                    SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_notes
-                FROM notes 
-                WHERE uploaded_by = ?
-            `, [user.id]);
-
-            user.total_notes = noteCounts.total_notes || 0;
-            user.approved_notes = noteCounts.approved_notes || 0;
-            user.pending_notes = noteCounts.pending_notes || 0;
-            user.rejected_notes = noteCounts.rejected_notes || 0;
-        }
-
-        res.setHeader('Content-Type', 'application/json');
-        res.json(users);
-    } catch (error) {
-        console.error('❌ Get users error:', error);
-        res.status(500).json({ error: 'Failed to load users: ' + error.message });
-    }
-});
-
-app.put('/admin/users/:id', requireAdmin, async (req, res) => {
-    const { username, email, student_id, department, batch, role } = req.body;
-    const userId = req.params.id;
-
-    if (student_id) {
-        const studentIdRegex = /^\d{3}-\d{3}-\d{3}$/;
-        if (!studentIdRegex.test(student_id)) {
-            return res.status(400).json({ error: 'Student ID must be in format: XXX-XXX-XXX (e.g., 123-456-789)' });
-        }
-    }
-
-    if (batch && (batch < 1 || batch > 999)) {
-        return res.status(400).json({ error: 'Please enter a valid batch number (1-999)' });
-    }
-
-    if (parseInt(userId) === req.session.user.id) {
-        return res.status(400).json({ error: 'Cannot modify your own account' });
-    }
-
-    try {
-        const existingUsers = await dbAll(
-            'SELECT id FROM users WHERE (username = ? OR email = ? OR student_id = ?) AND id != ?',
-            [username, email, student_id, userId]
-        );
-
-        if (existingUsers.length > 0) {
-            return res.status(400).json({ error: 'Username, email, or student ID already exists' });
-        }
-
-        await dbRun(
-            'UPDATE users SET username = ?, email = ?, student_id = ?, department = ?, batch = ?, role = ? WHERE id = ?',
-            [username, email, student_id, department, batch, role, userId]
-        );
-
-        res.json({ success: true, message: 'User updated successfully' });
-    } catch (error) {
-        console.error('Update user error:', error);
-        res.status(500).json({ error: 'Failed to update user: ' + error.message });
-    }
-});
-
-app.delete('/admin/users/:id', requireAdmin, async (req, res) => {
-    const userId = req.params.id;
-
-    console.log('🗑️ Delete user request:', userId);
-
-    if (parseInt(userId) === req.session.user.id) {
-        return res.status(400).json({ error: 'Cannot delete your own account' });
-    }
-
-    try {
-        const userNotes = await dbGet('SELECT COUNT(*) as note_count FROM notes WHERE uploaded_by = ?', [userId]);
-
-        if (userNotes.note_count > 0) {
-            return res.status(400).json({ error: 'Cannot delete user with uploaded notes. Please delete their notes first.' });
-        }
-
-        await dbRun('DELETE FROM users WHERE id = ?', [userId]);
-
-        res.setHeader('Content-Type', 'application/json');
-        res.json({ success: true, message: 'User deleted successfully' });
-    } catch (error) {
-        console.error('❌ Delete user error:', error);
-        res.status(500).json({ error: 'Failed to delete user: ' + error.message });
+        res.status(500).json({ error: 'Failed to load department' });
     }
 });
 
 app.get('/top-contributors', async (req, res) => {
     try {
         const contributors = await dbAll(`
-            SELECT 
-                u.username,
-                COUNT(n.id) as note_count,
-                SUM(CASE WHEN n.status = 'approved' THEN 10 ELSE 5 END) as contribution_score
-            FROM users u 
-            LEFT JOIN notes n ON u.id = n.uploaded_by 
+            SELECT u.username,
+                   COUNT(n.id) as note_count,
+                   SUM(CASE WHEN n.status = 'approved' THEN 10 ELSE 5 END) as contribution_score
+            FROM users u
+            LEFT JOIN notes n ON u.id = n.uploaded_by
             WHERE n.id IS NOT NULL
             GROUP BY u.id, u.username
             HAVING COUNT(n.id) > 0
@@ -453,6 +334,22 @@ app.get('/top-contributors', async (req, res) => {
     } catch (error) {
         console.error('Top contributors error:', error);
         res.status(500).json({ error: 'Failed to load top contributors' });
+    }
+});
+
+app.get('/courses', async (req, res) => {
+    try {
+        const courses = await dbAll(`
+            SELECT c.*, d.name as department_name,
+                   (SELECT COUNT(*) FROM notes WHERE course_id = c.id AND status = 'approved') as notes_count
+            FROM courses c
+            LEFT JOIN departments d ON c.department_id = d.id
+            ORDER BY c.name
+        `);
+        res.json(courses);
+    } catch (error) {
+        console.error('Courses error:', error);
+        res.status(500).json({ error: 'Failed to load courses' });
     }
 });
 
@@ -497,7 +394,7 @@ app.post('/upload-note', requireAuth, upload.single('noteFile'), async (req, res
     console.log('📤 Upload request received:', req.body.title);
 
     const { title, description, course_id } = req.body;
-    
+
     if (!req.file) {
         return res.status(400).json({ error: 'Please select a file to upload' });
     }
@@ -522,7 +419,7 @@ app.post('/upload-note', requireAuth, upload.single('noteFile'), async (req, res
         const { data: urlData } = supabase.storage
             .from('notes')
             .getPublicUrl(storagePath);
-            
+
         const fileUrl = urlData.publicUrl;
 
         const status = req.session.user.role === 'admin' ? 'approved' : 'pending';
@@ -667,7 +564,7 @@ app.get('/admin/stats', requireAdmin, async (req, res) => {
 
 app.post('/admin/departments', requireAdmin, async (req, res) => {
     const { name, code, description } = req.body;
-    
+
     try {
         await dbRun(
             'INSERT INTO departments (name, code, description, created_by) VALUES (?, ?, ?, ?)',
@@ -682,7 +579,7 @@ app.post('/admin/departments', requireAdmin, async (req, res) => {
 
 app.post('/admin/courses', requireAdmin, async (req, res) => {
     const { name, code, department_id, description } = req.body;
-    
+
     try {
         await dbRun(
             'INSERT INTO courses (name, code, department_id, description, created_by) VALUES (?, ?, ?, ?, ?)',
@@ -724,6 +621,49 @@ app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
     } catch (error) {
         console.error('Delete course error:', error);
         res.status(500).json({ error: 'Failed to delete course' });
+    }
+});
+
+app.get('/admin/users', requireAdmin, async (req, res) => {
+    try {
+        const users = await dbAll(`
+            SELECT u.*, 
+                   COUNT(n.id) as total_notes,
+                   SUM(CASE WHEN n.status = 'approved' THEN 1 ELSE 0 END) as approved_notes,
+                   SUM(CASE WHEN n.status = 'pending' THEN 1 ELSE 0 END) as pending_notes,
+                   SUM(CASE WHEN n.status = 'rejected' THEN 1 ELSE 0 END) as rejected_notes
+            FROM users u
+            LEFT JOIN notes n ON u.id = n.uploaded_by
+            GROUP BY u.id
+        `);
+        res.json(users);
+    } catch (error) {
+        console.error('Get users error:', error);
+        res.status(500).json({ error: 'Failed to load users' });
+    }
+});
+
+app.put('/admin/users/:id', requireAdmin, async (req, res) => {
+    const { username, email, student_id, department, batch, role } = req.body;
+    try {
+        await dbRun(
+            'UPDATE users SET username = ?, email = ?, student_id = ?, department = ?, batch = ?, role = ? WHERE id = ?',
+            [username, email, student_id, department, batch, role, req.params.id]
+        );
+        res.json({ success: true, message: 'User updated successfully' });
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({ error: 'Failed to update user' });
+    }
+});
+
+app.delete('/admin/users/:id', requireAdmin, async (req, res) => {
+    try {
+        await dbRun('DELETE FROM users WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({ error: 'Failed to delete user' });
     }
 });
 
