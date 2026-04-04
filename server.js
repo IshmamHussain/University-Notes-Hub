@@ -1,8 +1,6 @@
 const express = require('express');
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
 const bcrypt = require('bcryptjs');
-const session = require('express-session');
+const cookieSession = require('cookie-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -16,37 +14,6 @@ const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABA
 
 const app = express();
 
-// --- SQLite setup ---
-const DB_PATH = path.join(__dirname, 'university_notes_hub.db');
-let dbInstance = null;
-
-async function getDb() {
-    if (dbInstance) return dbInstance;
-    dbInstance = await open({
-        filename: DB_PATH,
-        driver: sqlite3.Database
-    });
-    await dbInstance.exec('PRAGMA journal_mode = WAL');
-    await dbInstance.exec('PRAGMA foreign_keys = ON');
-    return dbInstance;
-}
-
-// Helper: run a SELECT and return all rows
-async function dbAll(sql, params = []) {
-    const db = await getDb();
-    return db.all(sql, params);
-}
-// Helper: run INSERT/UPDATE/DELETE and return info
-async function dbRun(sql, params = []) {
-    const db = await getDb();
-    return db.run(sql, params);
-}
-// Helper: run a SELECT and return first row
-async function dbGet(sql, params = []) {
-    const db = await getDb();
-    return db.get(sql, params);
-}
-
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -56,7 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000'); // Update this to your Vercel URL later
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -69,20 +36,14 @@ app.use((req, res, next) => {
 app.use(express.static('.'));
 app.use('/uploads', express.static('uploads'));
 
-app.use(session({
-    secret: 'university-notes-secret-key-change-this-in-production',
-    resave: true,
-    saveUninitialized: true,
-    cookie: {
-        secure: false,
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
-        sameSite: 'lax'
-    }
+// Using cookie-session for serverless compatibility on Vercel
+app.use(cookieSession({
+    name: 'university-notes-session',
+    keys: [process.env.SESSION_SECRET || 'university-notes-secret-key-change-this-in-production'],
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
 }));
 
 const storage = multer.memoryStorage();
-
 const upload = multer({
     storage: storage,
     limits: { fileSize: 4.5 * 1024 * 1024 }, // Vercel limit is 4.5MB
@@ -97,27 +58,9 @@ const upload = multer({
     }
 });
 
-async function testDatabase() {
-    try {
-        console.log('✅ SQLite database connected:', DB_PATH);
-
-        const notesCount = await dbGet('SELECT COUNT(*) as count FROM notes');
-        console.log(`📝 Notes in database: ${notesCount.count}`);
-
-        const users = await dbAll('SELECT username, role FROM users');
-        console.log('👥 Users in database:');
-        users.forEach(user => {
-            console.log(`   - ${user.username} (${user.role})`);
-        });
-    } catch (error) {
-        console.error('❌ Database error:', error.message);
-    }
-}
-
 app.use((req, res, next) => {
     console.log('🔐 Session check:', {
         path: req.path,
-        sessionId: req.sessionID,
         user: req.session.user ? req.session.user.username : 'No user',
         role: req.session.user ? req.session.user.role : 'No role'
     });
@@ -125,52 +68,28 @@ app.use((req, res, next) => {
 });
 
 const requireAuth = (req, res, next) => {
-    console.log('🔐 Auth check for:', req.path, 'User:', req.session.user ? req.session.user.username : 'No user');
     if (req.session.user) {
         next();
     } else {
-        console.log('❌ Not authenticated');
         res.status(401).json({ error: 'Not authenticated' });
     }
 };
 
 const requireAdmin = (req, res, next) => {
-    console.log('🔐 Admin check for:', req.path);
-    console.log('   User:', req.session.user ? req.session.user.username : 'No user');
-    console.log('   Role:', req.session.user ? req.session.user.role : 'No role');
-
     if (req.session.user && req.session.user.role === 'admin') {
-        console.log('✅ Admin access granted');
         next();
     } else {
-        console.log('❌ Admin access denied');
         res.status(403).json({ error: 'Admin access required' });
     }
 };
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.get('/check-auth', (req, res) => {
-    console.log('🔐 Check-auth called, session:', req.session.user);
     if (req.session.user) {
         res.json(req.session.user);
     } else {
@@ -178,55 +97,49 @@ app.get('/check-auth', (req, res) => {
     }
 });
 
-app.get('/admin/test', requireAdmin, (req, res) => {
-    res.json({ message: 'Admin API is working!', user: req.session.user });
-});
-
 app.post('/login', async (req, res) => {
-    const { username: email, password } = req.body; // HTML sends 'username' field but it's an email now
-
-    console.log('🔐 Login attempt via Supabase Auth:', email);
+    const { username: loginQuery, password } = req.body;
 
     try {
         // Special bypass for built-in admin if needed
-        if (email === 'admin' && password === 'admin123') {
-            const users = await dbAll('SELECT * FROM users WHERE username = \'admin\'');
-            if (users.length > 0) {
+        if (loginQuery === 'admin' && password === 'admin123') {
+            const { data: users } = await supabase.from('users').select('*').eq('username', 'admin');
+            if (users && users.length > 0) {
                 req.session.user = { id: users[0].id, username: users[0].username, role: users[0].role };
-                return req.session.save(() => res.json({ success: true, user: req.session.user }));
+                return res.json({ success: true, user: req.session.user });
             }
         }
 
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (authError) {
-            return res.status(401).json({ error: authError.message });
+        // Check if loginQuery is an email or username
+        let userRecord;
+        if (loginQuery.includes('@')) {
+            const { data } = await supabase.from('users').select('*').eq('email', loginQuery);
+            userRecord = data ? data[0] : null;
+        } else {
+            const { data } = await supabase.from('users').select('*').eq('username', loginQuery);
+            userRecord = data ? data[0] : null;
         }
 
-        // Auth successful, email is confirmed (Supabase enforces this automatically by default)
-        // Fetch custom user data
-        const users = await dbAll('SELECT * FROM users WHERE email = ?', [email]);
-        if (users.length === 0) {
-            return res.status(401).json({ error: 'User metadata not found in database' });
+        if (!userRecord) {
+            return res.status(401).json({ error: 'Invalid login credentials' });
+        }
+
+        // Validate password using bcrypt
+        const isMatch = await bcrypt.compare(password, userRecord.password);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid login credentials' });
         }
 
         req.session.user = {
-            id: users[0].id,
-            username: users[0].username,
-            role: users[0].role
+            id: userRecord.id,
+            username: userRecord.username,
+            role: userRecord.role
         };
 
-        req.session.save((err) => {
-            if (err) throw err;
-            console.log('✅ Login successful:', email, 'Role:', users[0].role);
-            res.json({ success: true, user: req.session.user });
-        });
+        res.json({ success: true, user: req.session.user });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Server error: ' + error.message, stack: error.stack });
+        res.status(500).json({ error: 'Server error: ' + error.message });
     }
 });
 
@@ -238,24 +151,20 @@ app.post('/register', async (req, res) => {
     }
 
     try {
-        console.log('📝 Registering user in Supabase Auth:', email);
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password,
-        });
+        const { error: authError } = await supabase.auth.signUp({ email, password });
+        if (authError) return res.status(400).json({ error: authError.message });
 
-        if (authError) {
-            return res.status(400).json({ error: authError.message });
-        }
-
-        // Hash the password to satisfy the SQLite NOT NULL constraint securely
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Insert metadata into our custom 'users' table, now including the password
-        await dbRun(
-            'INSERT INTO users (username, email, department, password, role) VALUES (?, ?, ?, ?, ?)',
-            [username, email, department || null, hashedPassword, 'user']
-        );
+        const { error: dbError } = await supabase.from('users').insert([{
+            username,
+            email,
+            department: department || null,
+            password: hashedPassword,
+            role: 'user'
+        }]);
+
+        if (dbError) throw dbError;
 
         res.json({ success: true, message: 'Registration successful! Please check your email to verify your account.' });
     } catch (error) {
@@ -265,29 +174,30 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
-    console.log('🔐 Logout:', req.session.user ? req.session.user.username : 'No user');
-    req.session.destroy((err) => {
-        if (err) {
-            console.error('Logout error:', err);
-            return res.status(500).json({ error: 'Logout failed' });
-        }
-        res.json({ success: true });
-    });
+    req.session = null; // Clear cookie session
+    res.json({ success: true });
 });
 
 app.get('/departments', async (req, res) => {
     try {
-        const departments = await dbAll(`
-            SELECT 
-                d.*,
-                (SELECT COUNT(*) FROM courses WHERE department_id = d.id) as course_count,
-                (SELECT COUNT(*) FROM notes n 
-                 JOIN courses c ON n.course_id = c.id 
-                 WHERE c.department_id = d.id AND n.status = 'approved') as notes_count
-            FROM departments d
-            ORDER BY d.name
-        `);
-        res.json(departments);
+        const { data: departments, error: dErr } = await supabase.from('departments').select('*').order('name');
+        const { data: courses, error: cErr } = await supabase.from('courses').select('id, department_id');
+        const { data: notes, error: nErr } = await supabase.from('notes').select('course_id').eq('status', 'approved');
+
+        if (dErr || cErr || nErr) throw new Error('Database fetch failed');
+
+        const result = departments.map(dept => {
+            const deptCourses = courses.filter(c => c.department_id === dept.id);
+            const courseIds = deptCourses.map(c => c.id);
+            const deptNotes = notes.filter(n => courseIds.includes(n.course_id));
+
+            return {
+                ...dept,
+                course_count: deptCourses.length,
+                notes_count: deptNotes.length
+            };
+        });
+        res.json(result);
     } catch (error) {
         console.error('Departments error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -296,20 +206,20 @@ app.get('/departments', async (req, res) => {
 
 app.get('/department/:id', async (req, res) => {
     try {
-        const departments = await dbAll('SELECT * FROM departments WHERE id = ?', [req.params.id]);
+        const { data: depts, error: dErr } = await supabase.from('departments').select('*').eq('id', req.params.id);
+        if (dErr || !depts || depts.length === 0) return res.status(404).json({ error: 'Department not found' });
 
-        if (departments.length === 0) {
-            return res.status(404).json({ error: 'Department not found' });
-        }
+        const { data: courses, error: cErr } = await supabase.from('courses').select('*').eq('department_id', req.params.id);
+        const { data: notes, error: nErr } = await supabase.from('notes').select('course_id').eq('status', 'approved');
 
-        const courses = await dbAll(`
-            SELECT c.*,
-                   (SELECT COUNT(*) FROM notes WHERE course_id = c.id AND status = 'approved') as notes_count
-            FROM courses c
-            WHERE c.department_id = ?
-        `, [req.params.id]);
+        const coursesWithCounts = (courses || []).map(course => {
+            return {
+                ...course,
+                notes_count: (notes || []).filter(n => n.course_id === course.id).length
+            };
+        });
 
-        res.json({ department: departments[0], courses });
+        res.json({ department: depts[0], courses: coursesWithCounts });
     } catch (error) {
         console.error('Department error:', error);
         res.status(500).json({ error: 'Failed to load department' });
@@ -318,19 +228,24 @@ app.get('/department/:id', async (req, res) => {
 
 app.get('/top-contributors', async (req, res) => {
     try {
-        const contributors = await dbAll(`
-            SELECT u.username,
-                   COUNT(n.id) as note_count,
-                   SUM(CASE WHEN n.status = 'approved' THEN 10 ELSE 5 END) as contribution_score
-            FROM users u
-            LEFT JOIN notes n ON u.id = n.uploaded_by
-            WHERE n.id IS NOT NULL
-            GROUP BY u.id, u.username
-            HAVING COUNT(n.id) > 0
-            ORDER BY contribution_score DESC, note_count DESC
-            LIMIT 3
-        `);
-        res.json(contributors);
+        const { data: users } = await supabase.from('users').select('id, username');
+        const { data: notes } = await supabase.from('notes').select('uploaded_by, status');
+
+        const stats = users.map(user => {
+            const userNotes = notes.filter(n => n.uploaded_by === user.id);
+            let score = 0;
+            userNotes.forEach(n => {
+                score += n.status === 'approved' ? 10 : 5;
+            });
+            return {
+                username: user.username,
+                note_count: userNotes.length,
+                contribution_score: score
+            };
+        }).filter(u => u.note_count > 0);
+
+        stats.sort((a, b) => b.contribution_score - a.contribution_score || b.note_count - a.note_count);
+        res.json(stats.slice(0, 3));
     } catch (error) {
         console.error('Top contributors error:', error);
         res.status(500).json({ error: 'Failed to load top contributors' });
@@ -339,14 +254,19 @@ app.get('/top-contributors', async (req, res) => {
 
 app.get('/courses', async (req, res) => {
     try {
-        const courses = await dbAll(`
-            SELECT c.*, d.name as department_name,
-                   (SELECT COUNT(*) FROM notes WHERE course_id = c.id AND status = 'approved') as notes_count
-            FROM courses c
-            LEFT JOIN departments d ON c.department_id = d.id
-            ORDER BY c.name
-        `);
-        res.json(courses);
+        const { data: courses } = await supabase.from('courses').select('*').order('name');
+        const { data: departments } = await supabase.from('departments').select('id, name');
+        const { data: notes } = await supabase.from('notes').select('course_id').eq('status', 'approved');
+
+        const result = courses.map(course => {
+            const dept = departments.find(d => d.id === course.department_id);
+            return {
+                ...course,
+                department_name: dept ? dept.name : 'Unknown',
+                notes_count: notes.filter(n => n.course_id === course.id).length
+            };
+        });
+        res.json(result);
     } catch (error) {
         console.error('Courses error:', error);
         res.status(500).json({ error: 'Failed to load courses' });
@@ -355,35 +275,26 @@ app.get('/courses', async (req, res) => {
 
 app.get('/course/:id', requireAuth, async (req, res) => {
     try {
-        const courses = await dbAll(
-            'SELECT c.*, d.name as department_name FROM courses c JOIN departments d ON c.department_id = d.id WHERE c.id = ?',
-            [req.params.id]
-        );
+        const { data: courses } = await supabase.from('courses').select('*').eq('id', req.params.id);
+        if (!courses || courses.length === 0) return res.status(404).json({ error: 'Course not found' });
 
-        if (courses.length === 0) {
-            return res.status(404).json({ error: 'Course not found' });
+        const { data: depts } = await supabase.from('departments').select('name').eq('id', courses[0].department_id);
+        const courseData = { ...courses[0], department_name: depts && depts.length > 0 ? depts[0].name : 'Unknown' };
+
+        let notesQuery = supabase.from('notes').select('*, users(username)').eq('course_id', req.params.id).order('uploaded_at', { ascending: false });
+
+        if (req.session.user.role !== 'admin') {
+            notesQuery = notesQuery.or(`status.eq.approved,uploaded_by.eq.${req.session.user.id}`);
         }
 
-        let notes;
-        if (req.session.user.role === 'admin') {
-            notes = await dbAll(
-                `SELECT n.*, u.username as uploaded_by_name FROM notes n 
-                 JOIN users u ON n.uploaded_by = u.id 
-                 WHERE n.course_id = ?
-                 ORDER BY n.uploaded_at DESC`,
-                [req.params.id]
-            );
-        } else {
-            notes = await dbAll(
-                `SELECT n.*, u.username as uploaded_by_name FROM notes n 
-                 JOIN users u ON n.uploaded_by = u.id 
-                 WHERE n.course_id = ? AND (n.status = 'approved' OR n.uploaded_by = ?)
-                 ORDER BY n.uploaded_at DESC`,
-                [req.params.id, req.session.user.id]
-            );
-        }
+        const { data: notesData } = await notesQuery;
 
-        res.json({ course: courses[0], notes });
+        const formattedNotes = (notesData || []).map(note => ({
+            ...note,
+            uploaded_by_name: note.users ? note.users.username : 'Unknown'
+        }));
+
+        res.json({ course: courseData, notes: formattedNotes });
     } catch (error) {
         console.error('Course error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -391,73 +302,46 @@ app.get('/course/:id', requireAuth, async (req, res) => {
 });
 
 app.post('/upload-note', requireAuth, upload.single('noteFile'), async (req, res) => {
-    console.log('📤 Upload request received:', req.body.title);
-
     const { title, description, course_id } = req.body;
-
-    if (!req.file) {
-        return res.status(400).json({ error: 'Please select a file to upload' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'Please select a file to upload' });
 
     try {
         const fileExt = path.extname(req.file.originalname).toLowerCase();
         const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExt}`;
-        const storagePath = `${uniqueFileName}`;
 
-        console.log('☁️ Uploading to Supabase Storage...');
-        const { data, error } = await supabase.storage
+        const { error: storageError } = await supabase.storage
             .from('notes')
-            .upload(storagePath, req.file.buffer, {
-                contentType: req.file.mimetype,
-                upsert: false
-            });
+            .upload(uniqueFileName, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
 
-        if (error) {
-            throw new Error('Supabase Storage Error: ' + error.message);
-        }
+        if (storageError) throw new Error('Supabase Storage Error: ' + storageError.message);
 
-        const { data: urlData } = supabase.storage
-            .from('notes')
-            .getPublicUrl(storagePath);
-
-        const fileUrl = urlData.publicUrl;
-
+        const { data: urlData } = supabase.storage.from('notes').getPublicUrl(uniqueFileName);
         const status = req.session.user.role === 'admin' ? 'approved' : 'pending';
-        console.log('📝 Setting note status to:', status);
 
-        const result = await dbRun(
-            'INSERT INTO notes (title, description, file_name, file_path, file_size, course_id, uploaded_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
-            [title, description, req.file.originalname, fileUrl, req.file.size, course_id, req.session.user.id, status]
-        );
+        const { error: dbError } = await supabase.from('notes').insert([{
+            title, description, file_name: req.file.originalname, file_path: urlData.publicUrl,
+            file_size: req.file.size, course_id, uploaded_by: req.session.user.id, status
+        }]);
 
-        console.log('✅ Note inserted into database, ID:', result.lastID);
+        if (dbError) throw dbError;
 
-        const message = status === 'approved'
-            ? 'Note uploaded successfully!'
-            : 'Note uploaded successfully! It will be available after admin approval.';
-
+        const message = status === 'approved' ? 'Note uploaded successfully!' : 'Note uploaded successfully! It will be available after admin approval.';
         res.json({ success: true, message, status });
     } catch (error) {
-        console.error('❌ Database error:', error);
+        console.error('Upload error:', error);
         res.status(500).json({ error: 'Failed to upload note' });
     }
 });
 
 app.get('/download-note/:id', requireAuth, async (req, res) => {
     try {
-        const notes = await dbAll('SELECT * FROM notes WHERE id = ?', [req.params.id]);
-
-        if (notes.length === 0) {
-            return res.status(404).json({ error: 'Note not found' });
-        }
+        const { data: notes } = await supabase.from('notes').select('*').eq('id', req.params.id);
+        if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
         const note = notes[0];
-
         if (req.session.user.role !== 'admin' && note.status !== 'approved') {
             return res.status(403).json({ error: 'Note not approved for download' });
         }
-
-        // The file_path stores the public Supabase URL now. We can just redirect.
         res.redirect(note.file_path);
     } catch (error) {
         console.error('Download error:', error);
@@ -467,26 +351,20 @@ app.get('/download-note/:id', requireAuth, async (req, res) => {
 
 app.delete('/note/:id', requireAuth, async (req, res) => {
     try {
-        const notes = await dbAll('SELECT * FROM notes WHERE id = ?', [req.params.id]);
-
-        if (notes.length === 0) {
-            return res.status(404).json({ error: 'Note not found' });
-        }
+        const { data: notes } = await supabase.from('notes').select('*').eq('id', req.params.id);
+        if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
         const note = notes[0];
         if (note.uploaded_by !== req.session.user.id && req.session.user.role !== 'admin') {
             return res.status(403).json({ error: 'Not authorized to delete this note' });
         }
 
-        // Delete from Supabase Storage
         if (note.file_path && note.file_path.includes('supabase.co')) {
             const pathParts = note.file_path.split('/');
-            const fileName = pathParts[pathParts.length - 1];
-            await supabase.storage.from('notes').remove([fileName]);
+            await supabase.storage.from('notes').remove([pathParts[pathParts.length - 1]]);
         }
 
-        await dbRun('DELETE FROM notes WHERE id = ?', [req.params.id]);
-
+        await supabase.from('notes').delete().eq('id', req.params.id);
         res.json({ success: true, message: 'Note deleted successfully' });
     } catch (error) {
         console.error('Delete error:', error);
@@ -494,67 +372,54 @@ app.delete('/note/:id', requireAuth, async (req, res) => {
     }
 });
 
-
 app.get('/admin/pending-approvals', requireAdmin, async (req, res) => {
     try {
-        console.log('📋 Loading pending approvals for admin:', req.session.user.username);
-        const pendingNotes = await dbAll(`
-            SELECT n.*, u.username as uploaded_by_name, c.name as course_name 
-            FROM notes n 
-            JOIN users u ON n.uploaded_by = u.id 
-            JOIN courses c ON n.course_id = c.id 
-            WHERE n.status = 'pending'
-            ORDER BY n.uploaded_at DESC
-        `);
-        console.log('📝 Found pending notes:', pendingNotes.length);
-        res.setHeader('Content-Type', 'application/json');
-        res.json(pendingNotes);
+        const { data: notes } = await supabase.from('notes').select('*, users(username), courses(name)').eq('status', 'pending').order('uploaded_at', { ascending: false });
+
+        const formattedNotes = (notes || []).map(note => ({
+            ...note,
+            uploaded_by_name: note.users ? note.users.username : 'Unknown',
+            course_name: note.courses ? note.courses.name : 'Unknown'
+        }));
+
+        res.json(formattedNotes);
     } catch (error) {
-        console.error('❌ Pending approvals error:', error);
-        res.status(500).json({ error: 'Failed to load pending approvals: ' + error.message });
+        console.error('Pending approvals error:', error);
+        res.status(500).json({ error: 'Failed to load pending approvals' });
     }
 });
 
 app.post('/admin/approve-note/:id', requireAdmin, async (req, res) => {
     try {
-        await dbRun('UPDATE notes SET status = "approved" WHERE id = ?', [req.params.id]);
-        res.setHeader('Content-Type', 'application/json');
+        await supabase.from('notes').update({ status: 'approved' }).eq('id', req.params.id);
         res.json({ success: true, message: 'Note approved successfully' });
     } catch (error) {
-        console.error('Approve note error:', error);
         res.status(500).json({ error: 'Failed to approve note' });
     }
 });
 
 app.post('/admin/reject-note/:id', requireAdmin, async (req, res) => {
     try {
-        await dbRun('UPDATE notes SET status = "rejected" WHERE id = ?', [req.params.id]);
-        res.setHeader('Content-Type', 'application/json');
+        await supabase.from('notes').update({ status: 'rejected' }).eq('id', req.params.id);
         res.json({ success: true, message: 'Note rejected successfully' });
     } catch (error) {
-        console.error('Reject note error:', error);
         res.status(500).json({ error: 'Failed to reject note' });
     }
 });
 
 app.get('/admin/stats', requireAdmin, async (req, res) => {
     try {
-        const userCount = await dbGet('SELECT COUNT(*) as count FROM users');
-        const deptCount = await dbGet('SELECT COUNT(*) as count FROM departments');
-        const courseCount = await dbGet('SELECT COUNT(*) as count FROM courses');
-        const approvedNoteCount = await dbGet('SELECT COUNT(*) as count FROM notes WHERE status = "approved"');
-        const pendingCount = await dbGet('SELECT COUNT(*) as count FROM notes WHERE status = "pending"');
-        const rejectedCount = await dbGet('SELECT COUNT(*) as count FROM notes WHERE status = "rejected"');
-        const totalNoteCount = await dbGet('SELECT COUNT(*) as count FROM notes');
+        const { count: uCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
+        const { count: dCount } = await supabase.from('departments').select('*', { count: 'exact', head: true });
+        const { count: cCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
+        const { count: nAppr } = await supabase.from('notes').select('*', { count: 'exact', head: true }).eq('status', 'approved');
+        const { count: nPend } = await supabase.from('notes').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        const { count: nRej } = await supabase.from('notes').select('*', { count: 'exact', head: true }).eq('status', 'rejected');
+        const { count: nTotal } = await supabase.from('notes').select('*', { count: 'exact', head: true });
 
         res.json({
-            users: userCount.count,
-            departments: deptCount.count,
-            courses: courseCount.count,
-            notes: approvedNoteCount.count,
-            pending_approvals: pendingCount.count,
-            rejected_notes: rejectedCount.count,
-            total_notes: totalNoteCount.count
+            users: uCount || 0, departments: dCount || 0, courses: cCount || 0,
+            notes: nAppr || 0, pending_approvals: nPend || 0, rejected_notes: nRej || 0, total_notes: nTotal || 0
         });
     } catch (error) {
         console.error('Admin stats error:', error);
@@ -564,79 +429,64 @@ app.get('/admin/stats', requireAdmin, async (req, res) => {
 
 app.post('/admin/departments', requireAdmin, async (req, res) => {
     const { name, code, description } = req.body;
-
     try {
-        await dbRun(
-            'INSERT INTO departments (name, code, description, created_by) VALUES (?, ?, ?, ?)',
-            [name, code, description, req.session.user.id]
-        );
+        await supabase.from('departments').insert([{ name, code, description, created_by: req.session.user.id }]);
         res.json({ success: true, message: 'Department added successfully' });
     } catch (error) {
-        console.error('Add department error:', error);
         res.status(500).json({ error: 'Failed to add department' });
     }
 });
 
 app.post('/admin/courses', requireAdmin, async (req, res) => {
     const { name, code, department_id, description } = req.body;
-
     try {
-        await dbRun(
-            'INSERT INTO courses (name, code, department_id, description, created_by) VALUES (?, ?, ?, ?, ?)',
-            [name, code, department_id, description, req.session.user.id]
-        );
+        await supabase.from('courses').insert([{ name, code, department_id, description, created_by: req.session.user.id }]);
         res.json({ success: true, message: 'Course added successfully' });
     } catch (error) {
-        console.error('Add course error:', error);
         res.status(500).json({ error: 'Failed to add course' });
     }
 });
 
 app.delete('/admin/departments/:id', requireAdmin, async (req, res) => {
     try {
-        const courses = await dbGet('SELECT COUNT(*) as course_count FROM courses WHERE department_id = ?', [req.params.id]);
+        const { count } = await supabase.from('courses').select('*', { count: 'exact', head: true }).eq('department_id', req.params.id);
+        if (count > 0) return res.status(400).json({ error: 'Cannot delete department with existing courses.' });
 
-        if (courses.course_count > 0) {
-            return res.status(400).json({ error: 'Cannot delete department with existing courses. Please delete all courses first.' });
-        }
-
-        await dbRun('DELETE FROM departments WHERE id = ?', [req.params.id]);
+        await supabase.from('departments').delete().eq('id', req.params.id);
         res.json({ success: true, message: 'Department deleted successfully' });
     } catch (error) {
-        console.error('Delete department error:', error);
         res.status(500).json({ error: 'Failed to delete department' });
     }
 });
 
 app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
     try {
-        const notes = await dbGet('SELECT COUNT(*) as note_count FROM notes WHERE course_id = ?', [req.params.id]);
+        const { count } = await supabase.from('notes').select('*', { count: 'exact', head: true }).eq('course_id', req.params.id);
+        if (count > 0) return res.status(400).json({ error: 'Cannot delete course with existing notes.' });
 
-        if (notes.note_count > 0) {
-            return res.status(400).json({ error: 'Cannot delete course with existing notes. Please delete all notes first.' });
-        }
-
-        await dbRun('DELETE FROM courses WHERE id = ?', [req.params.id]);
+        await supabase.from('courses').delete().eq('id', req.params.id);
         res.json({ success: true, message: 'Course deleted successfully' });
     } catch (error) {
-        console.error('Delete course error:', error);
         res.status(500).json({ error: 'Failed to delete course' });
     }
 });
 
 app.get('/admin/users', requireAdmin, async (req, res) => {
     try {
-        const users = await dbAll(`
-            SELECT u.*, 
-                   COUNT(n.id) as total_notes,
-                   SUM(CASE WHEN n.status = 'approved' THEN 1 ELSE 0 END) as approved_notes,
-                   SUM(CASE WHEN n.status = 'pending' THEN 1 ELSE 0 END) as pending_notes,
-                   SUM(CASE WHEN n.status = 'rejected' THEN 1 ELSE 0 END) as rejected_notes
-            FROM users u
-            LEFT JOIN notes n ON u.id = n.uploaded_by
-            GROUP BY u.id
-        `);
-        res.json(users);
+        const { data: users } = await supabase.from('users').select('*');
+        const { data: notes } = await supabase.from('notes').select('uploaded_by, status');
+
+        const result = (users || []).map(user => {
+            const userNotes = (notes || []).filter(n => n.uploaded_by === user.id);
+            return {
+                ...user,
+                total_notes: userNotes.length,
+                approved_notes: userNotes.filter(n => n.status === 'approved').length,
+                pending_notes: userNotes.filter(n => n.status === 'pending').length,
+                rejected_notes: userNotes.filter(n => n.status === 'rejected').length
+            };
+        });
+        res.json(result);
     } catch (error) {
         console.error('Get users error:', error);
         res.status(500).json({ error: 'Failed to load users' });
@@ -646,40 +496,30 @@ app.get('/admin/users', requireAdmin, async (req, res) => {
 app.put('/admin/users/:id', requireAdmin, async (req, res) => {
     const { username, email, student_id, department, batch, role } = req.body;
     try {
-        await dbRun(
-            'UPDATE users SET username = ?, email = ?, student_id = ?, department = ?, batch = ?, role = ? WHERE id = ?',
-            [username, email, student_id, department, batch, role, req.params.id]
-        );
+        await supabase.from('users').update({ username, email, student_id, department, batch, role }).eq('id', req.params.id);
         res.json({ success: true, message: 'User updated successfully' });
     } catch (error) {
-        console.error('Update user error:', error);
         res.status(500).json({ error: 'Failed to update user' });
     }
 });
 
 app.delete('/admin/users/:id', requireAdmin, async (req, res) => {
     try {
-        await dbRun('DELETE FROM users WHERE id = ?', [req.params.id]);
+        await supabase.from('users').delete().eq('id', req.params.id);
         res.json({ success: true, message: 'User deleted successfully' });
     } catch (error) {
-        console.error('Delete user error:', error);
         res.status(500).json({ error: 'Failed to delete user' });
     }
 });
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 3000;
-
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
-        console.log('📚 University Notes Hub is ready locally!');
-        if (typeof testDatabase === 'function') testDatabase();
+        console.log('📚 University Notes Hub is ready locally (Supabase connected)!');
     });
 }
 
-// Export for Vercel
 module.exports = app;
