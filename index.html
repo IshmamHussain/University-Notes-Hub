@@ -2456,13 +2456,26 @@
                     await viewCourse(currentCourseId);
 
                 } else {
-                    const error = await response.json();
-                    console.error('Upload failed:', error);
-                    showMessage('courseMessage', 'Upload failed: ' + (error.error || 'Unknown error'), 'error');
+                    const errorText = await response.text();
+                    let errorMessage = 'Unknown error';
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.error || errorJson.message || 'Unknown error';
+                    } catch (e) {
+                        if (response.status === 413) {
+                            errorMessage = 'File is too large! Maximum allowed size is 4.5MB on Vercel.';
+                        } else if (response.status === 504) {
+                            errorMessage = 'Upload timed out. Your connection might be too slow.';
+                        } else {
+                            errorMessage = `Server returned HTTP ${response.status}.`;
+                        }
+                    }
+                    console.error('Upload failed:', errorMessage, errorText);
+                    showMessage('courseMessage', 'Upload failed: ' + errorMessage, 'error');
                 }
             } catch (error) {
-                console.error('Upload error:', error);
-                showMessage('courseMessage', 'Upload failed. Please try again.', 'error');
+                console.error('Upload network error:', error);
+                showMessage('courseMessage', 'Network error. Please check your connection and try again.', 'error');
             }
         }
 
