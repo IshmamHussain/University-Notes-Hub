@@ -200,24 +200,9 @@ app.post('/logout', (req, res) => {
 
 app.get('/departments', async (req, res) => {
     try {
-        const { data: departments, error: dErr } = await supabase.from('departments').select('*').order('name');
-        const { data: courses, error: cErr } = await supabase.from('courses').select('id, department_id');
-        const { data: notes, error: nErr } = await supabase.from('notes').select('course_id').eq('status', 'approved');
-
-        if (dErr || cErr || nErr) throw new Error('Database fetch failed');
-
-        const result = departments.map(dept => {
-            const deptCourses = courses.filter(c => c.department_id === dept.id);
-            const courseIds = deptCourses.map(c => c.id);
-            const deptNotes = notes.filter(n => courseIds.includes(n.course_id));
-
-            return {
-                ...dept,
-                course_count: deptCourses.length,
-                notes_count: deptNotes.length
-            };
-        });
-        res.json(result);
+        const { data: departments, error: dErr } = await supabase.from('department_stats').select('*').order('name');
+        if (dErr) throw new Error('Database fetch failed');
+        res.json(departments || []);
     } catch (error) {
         console.error('Departments error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -226,20 +211,12 @@ app.get('/departments', async (req, res) => {
 
 app.get('/department/:id', async (req, res) => {
     try {
-        const { data: depts, error: dErr } = await supabase.from('departments').select('*').eq('id', req.params.id);
+        const { data: depts, error: dErr } = await supabase.from('department_stats').select('*').eq('id', req.params.id);
         if (dErr || !depts || depts.length === 0) return res.status(404).json({ error: 'Department not found' });
 
-        const { data: courses, error: cErr } = await supabase.from('courses').select('*').eq('department_id', req.params.id);
-        const { data: notes, error: nErr } = await supabase.from('notes').select('course_id').eq('status', 'approved');
-
-        const coursesWithCounts = (courses || []).map(course => {
-            return {
-                ...course,
-                notes_count: (notes || []).filter(n => n.course_id === course.id).length
-            };
-        });
-
-        res.json({ department: depts[0], courses: coursesWithCounts });
+        const { data: courses, error: cErr } = await supabase.from('course_stats').select('*').eq('department_id', req.params.id);
+        
+        res.json({ department: depts[0], courses: courses || [] });
     } catch (error) {
         console.error('Department error:', error);
         res.status(500).json({ error: 'Failed to load department' });
@@ -248,21 +225,16 @@ app.get('/department/:id', async (req, res) => {
 
 app.get('/top-contributors', async (req, res) => {
     try {
-        const { data: users } = await supabase.from('users').select('id, username');
-        const { data: notes } = await supabase.from('notes').select('uploaded_by, status');
+        const { data: users } = await supabase.from('user_stats').select('*').gt('total_notes', 0);
 
-        const stats = users.map(user => {
-            const userNotes = notes.filter(n => n.uploaded_by === user.id);
-            let score = 0;
-            userNotes.forEach(n => {
-                score += n.status === 'approved' ? 10 : 5;
-            });
+        const stats = (users || []).map(user => {
+            const score = (user.approved_notes * 10) + ((user.pending_notes + user.rejected_notes) * 5);
             return {
                 username: user.username,
-                note_count: userNotes.length,
+                note_count: user.total_notes,
                 contribution_score: score
             };
-        }).filter(u => u.note_count > 0);
+        });
 
         stats.sort((a, b) => b.contribution_score - a.contribution_score || b.note_count - a.note_count);
         res.json(stats.slice(0, 3));
@@ -274,19 +246,9 @@ app.get('/top-contributors', async (req, res) => {
 
 app.get('/courses', async (req, res) => {
     try {
-        const { data: courses } = await supabase.from('courses').select('*').order('name');
-        const { data: departments } = await supabase.from('departments').select('id, name');
-        const { data: notes } = await supabase.from('notes').select('course_id').eq('status', 'approved');
-
-        const result = courses.map(course => {
-            const dept = departments.find(d => d.id === course.department_id);
-            return {
-                ...course,
-                department_name: dept ? dept.name : 'Unknown',
-                notes_count: notes.filter(n => n.course_id === course.id).length
-            };
-        });
-        res.json(result);
+        const { data: courses, error: cErr } = await supabase.from('course_stats').select('*').order('name');
+        if (cErr) throw new Error('Failed to fetch courses');
+        res.json(courses || []);
     } catch (error) {
         console.error('Courses error:', error);
         res.status(500).json({ error: 'Failed to load courses' });
@@ -493,20 +455,9 @@ app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
 
 app.get('/admin/users', requireAdmin, async (req, res) => {
     try {
-        const { data: users } = await supabase.from('users').select('id, username, email, student_id, department, batch, role, created_at').order('created_at', { ascending: false });
-        const { data: notes } = await supabase.from('notes').select('uploaded_by, status');
-
-        const result = (users || []).map(user => {
-            const userNotes = (notes || []).filter(n => n.uploaded_by === user.id);
-            return {
-                ...user,
-                total_notes: userNotes.length,
-                approved_notes: userNotes.filter(n => n.status === 'approved').length,
-                pending_notes: userNotes.filter(n => n.status === 'pending').length,
-                rejected_notes: userNotes.filter(n => n.status === 'rejected').length
-            };
-        });
-        res.json(result);
+        const { data: users, error } = await supabase.from('user_stats').select('*').order('created_at', { ascending: false });
+        if (error) throw new Error('Database fetch failed');
+        res.json(users || []);
     } catch (error) {
         console.error('Get users error:', error);
         res.status(500).json({ error: 'Failed to load users' });
