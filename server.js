@@ -502,7 +502,9 @@ app.get('/admin/users', requireAdmin, async (req, res) => {
 });
 
 app.put('/admin/users/:id', requireAdmin, async (req, res) => {
-    const { username, email, student_id, department, batch, role } = req.body;
+    let { username, email, student_id, department, batch, role } = req.body;
+    username = username ? username.trim() : null;
+    email = email ? email.trim().toLowerCase() : null;
     try {
         await supabase.from('users').update({ username, email, student_id, department, batch, role }).eq('id', req.params.id);
         res.json({ success: true, message: 'User updated successfully' });
