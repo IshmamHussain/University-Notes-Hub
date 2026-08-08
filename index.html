@@ -1658,6 +1658,8 @@
             <div id="courseHeader" class="course-header">
             </div>
 
+            <div id="courseMessage" class="message message-success"></div>
+
             <div class="upload-section">
                 <h3 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
                     <i class="fas fa-cloud-upload-alt"></i> Upload New Notes
@@ -2456,11 +2458,11 @@
                 } else {
                     const error = await response.json();
                     console.error('Upload failed:', error);
-                    showMessage('dashboardMessage', 'Upload failed: ' + error.error, 'error');
+                    showMessage('courseMessage', 'Upload failed: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Upload error:', error);
-                showMessage('dashboardMessage', 'Upload failed. Please try again.', 'error');
+                showMessage('courseMessage', 'Upload failed. Please try again.', 'error');
             }
         }
 
@@ -2569,11 +2571,27 @@
 
         async function downloadNote(noteId) {
             try {
-                window.open(`${API_BASE}/download-note/${noteId}`, '_blank');
-                showMessage('dashboardMessage', 'Download started...', 'success');
+                showMessage('dashboardMessage', 'Preparing download...', 'success');
+                const response = await apiFetch(`${API_BASE}/download-note/${noteId}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to download');
+                }
+                
+                const data = await response.json();
+                
+                const a = document.createElement('a');
+                a.href = data.url;
+                a.download = '';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                showMessage('dashboardMessage', 'Download started!', 'success');
             } catch (error) {
                 console.error('Download error:', error);
-                showMessage('dashboardMessage', 'Download failed', 'error');
+                showMessage('dashboardMessage', error.message || 'Download failed', 'error');
             }
         }
 

@@ -56,10 +56,14 @@ const upload = multer({
             'application/vnd.openxmlformats-officedocument.presentationml.presentation'
         ];
         const fileExt = path.extname(file.originalname).toLowerCase();
-        if (allowedTypes.includes(fileExt) && allowedMimeTypes.includes(file.mimetype)) {
-            cb(null, true);
+        if (allowedTypes.includes(fileExt)) {
+            if (allowedMimeTypes.includes(file.mimetype) || file.mimetype === 'application/octet-stream' || file.mimetype === 'application/x-zip-compressed') {
+                cb(null, true);
+            } else {
+                cb(new Error(`Invalid MIME type: ${file.mimetype}`));
+            }
         } else {
-            cb(new Error('Only document files are allowed! Invalid type or extension.'));
+            cb(new Error('Only document files are allowed! Invalid extension.'));
         }
     }
 });
@@ -118,11 +122,16 @@ app.post('/login', async (req, res) => {
 
     try {
         // Special bypass for built-in admin if needed
-        if (loginQuery === 'admin' && password === 'admin123') {
-            const { data: users } = await supabase.from('users').select('*').eq('username', 'admin');
-            if (users && users.length > 0) {
-                req.session.user = { id: users[0].id, username: users[0].username, role: users[0].role };
-                return res.json({ success: true, user: req.session.user });
+        if (loginQuery === 'admin') {
+            const adminHash = process.env.ADMIN_PASSWORD_HASH || '$2a$10$DqF7Espfm1XTrp9J/ehY/OSSsB4F2/3cYPYerx2SfTeHUbRquHnHG';
+            const isValid = await bcrypt.compare(password, adminHash);
+            
+            if (isValid) {
+                const { data: users } = await supabase.from('users').select('*').eq('username', 'admin');
+                if (users && users.length > 0) {
+                    req.session.user = { id: users[0].id, username: users[0].username, role: users[0].role };
+                    return res.json({ success: true, user: req.session.user });
+                }
             }
         }
 
@@ -324,7 +333,7 @@ app.get('/download-note/:id', requireAuth, async (req, res) => {
         if (req.session.user.role !== 'admin' && note.status !== 'approved') {
             return res.status(403).json({ error: 'Note not approved for download' });
         }
-        res.redirect(note.file_path);
+        res.json({ url: note.file_path + '?download=' });
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ error: 'Download failed' });
@@ -555,6 +564,11 @@ app.get('/verified', (req, res) => {
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+app.use((err, req, res, next) => {
+    console.error('Express error:', err);
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
+});
 
 const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production') {
