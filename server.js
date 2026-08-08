@@ -31,17 +31,16 @@ app.use((req, res, next) => {
 app.use(express.static('.'));
 app.use('/uploads', express.static('uploads'));
 
-// Using cookie-session for serverless compatibility on Vercel
 app.use(cookieSession({
     name: 'university-notes-session',
     keys: [process.env.SESSION_SECRET || 'university-notes-secret-key-change-this-in-production'],
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000
 }));
 
 const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 4.5 * 1024 * 1024 }, // Vercel limit is 4.5MB
+    limits: { fileSize: 4.5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
         const fileExt = path.extname(file.originalname).toLowerCase();
@@ -93,7 +92,17 @@ app.get('/check-auth', (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-    const { username: loginQuery, password } = req.body;
+    let { username: loginQuery, password } = req.body;
+
+    if (!loginQuery || !password) {
+        return res.status(400).json({ error: 'Username/Email and password are required' });
+    }
+    
+    // Trim spaces and handle case sensitivity for emails
+    loginQuery = loginQuery.trim();
+    if (loginQuery.includes('@')) {
+        loginQuery = loginQuery.toLowerCase();
+    }
 
     try {
         // Special bypass for built-in admin if needed
@@ -139,7 +148,11 @@ app.post('/login', async (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-    const { username, email, department, password, confirmPassword } = req.body;
+    let { username, email, department, password, confirmPassword } = req.body;
+
+    // Normalize inputs
+    username = username ? username.trim() : '';
+    email = email ? email.trim().toLowerCase() : '';
 
     if (password !== confirmPassword) {
         return res.status(400).json({ error: 'Passwords do not match' });
