@@ -31,6 +31,10 @@ app.use((req, res, next) => {
 app.use(express.static('.'));
 app.use('/uploads', express.static('uploads'));
 
+if (!process.env.SESSION_SECRET) {
+    console.warn("WARNING: SESSION_SECRET is not set! Using fallback secret.");
+}
+
 app.use(cookieSession({
     name: 'university-notes-session',
     keys: [process.env.SESSION_SECRET || 'university-notes-secret-key-change-this-in-production'],
@@ -43,11 +47,19 @@ const upload = multer({
     limits: { fileSize: 4.5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
+        const allowedMimeTypes = [
+            'application/pdf', 
+            'application/msword', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        ];
         const fileExt = path.extname(file.originalname).toLowerCase();
-        if (allowedTypes.includes(fileExt)) {
+        if (allowedTypes.includes(fileExt) && allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Only document files are allowed!'));
+            cb(new Error('Only document files are allowed! Invalid type or extension.'));
         }
     }
 });
@@ -481,7 +493,7 @@ app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
 
 app.get('/admin/users', requireAdmin, async (req, res) => {
     try {
-        const { data: users } = await supabase.from('users').select('*');
+        const { data: users } = await supabase.from('users').select('id, username, email, student_id, department, batch, role, created_at').order('created_at', { ascending: false });
         const { data: notes } = await supabase.from('notes').select('uploaded_by, status');
 
         const result = (users || []).map(user => {

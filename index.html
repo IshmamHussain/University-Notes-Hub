@@ -1915,6 +1915,19 @@
     <script>
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
 
+        function escapeHTML(str) {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag])
+            );
+        }
+
         let currentUser = null;
         let currentDepartmentId = null;
         let currentCourseId = null;
@@ -2031,7 +2044,7 @@
                                 ${rankNumber}
                             </div>
                             <div class="contributor-info">
-                                <div class="contributor-name">${contributor.username}</div>
+                                <div class="contributor-name">${escapeHTML(contributor.username)}</div>
                                 <div class="contributor-stats">
                                     <span class="contributor-notes">
                                         <i class="fas fa-file-alt"></i> ${contributor.note_count || 0} notes
@@ -2283,9 +2296,9 @@
                             </div>
                             <span class="course-count">${course.notes_count || 0} notes</span>
                         </div>
-                        <h3 class="department-name">${course.name}</h3>
-                        <p class="department-code">${course.code}</p>
-                        <p class="department-description">${course.description}</p>
+                        <h3 class="department-name">${escapeHTML(course.name)}</h3>
+                        <p class="department-code">${escapeHTML(course.code)}</p>
+                        <p class="department-description">${escapeHTML(course.description)}</p>
                         <button class="btn btn-secondary" style="width: 100%;" onclick="viewCourse(${course.id})">
                             View Notes <i class="fas fa-arrow-right"></i>
                         </button>
@@ -2337,13 +2350,13 @@
                             <div class="note-info">
                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem;">
                                     ${fileIcon}
-                                    <h4>${note.title}</h4>
+                                    <h4>${escapeHTML(note.title)}</h4>
                                     ${statusBadge}
                                     ${isUploader ? `<span style="font-size: 0.8rem; color: var(--primary); margin-left: 10px;"><i class="fas fa-user-edit"></i> Your upload</span>` : ''}
                                 </div>
-                                <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${note.description}</p>
+                                <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${escapeHTML(note.description)}</p>
                                 <div class="note-meta">
-                                    <i class="fas fa-user"></i> ${note.uploaded_by_name} • 
+                                    <i class="fas fa-user"></i> ${escapeHTML(note.uploaded_by_name)} • 
                                     <i class="fas fa-calendar"></i> ${new Date(note.uploaded_at).toLocaleDateString()}
                                     ${note.file_size ? ` • <i class="fas fa-weight-hanging"></i> ${(note.file_size / 1024 / 1024).toFixed(1)} MB` : ''}
                                     ${isUploader && note.status === 'pending' ? ' • <i class="fas fa-clock" style="color: var(--warning);"></i> Awaiting admin review' : ''}
@@ -2666,8 +2679,8 @@
                     <div style="background: var(--light); padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid var(--border-color);">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
                             <div style="flex: 1;">
-                                <strong>${dept.name}</strong> (${dept.code})
-                                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">${dept.description}</div>
+                                <strong>${escapeHTML(dept.name)}</strong> (${escapeHTML(dept.code)})
+                                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">${escapeHTML(dept.description)}</div>
                             </div>
                             <button class="btn btn-danger btn-small" onclick="deleteDepartment(${dept.id}, '${dept.name}')" style="margin-left: 10px;">
                                 <i class="fas fa-trash"></i>
@@ -2690,8 +2703,8 @@
                     <div style="background: var(--light); padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid var(--border-color);">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
                             <div style="flex: 1;">
-                                <strong>${course.name}</strong> (${course.code})
-                                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">${course.department_name} • ${course.description}</div>
+                                <strong>${escapeHTML(course.name)}</strong> (${escapeHTML(course.code)})
+                                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">${escapeHTML(course.department_name)} • ${escapeHTML(course.description)}</div>
                             </div>
                             <button class="btn btn-danger btn-small" onclick="deleteCourse(${course.id}, '${course.name}')" style="margin-left: 10px;">
                                 <i class="fas fa-trash"></i>
@@ -2746,13 +2759,13 @@
                         ${user.student_id ? `
                             <div class="student-info-badge">
                                 <i class="fas fa-id-card"></i>
-                                <span>ID: ${user.student_id}</span>
+                                <span>ID: ${escapeHTML(user.student_id)}</span>
                             </div>
                         ` : ''}
                         ${user.department ? `
                             <div class="student-info-badge">
                                 <i class="fas fa-building"></i>
-                                <span>${user.department}</span>
+                                <span>${escapeHTML(user.department)}</span>
                             </div>
                         ` : ''}
                         ${user.batch ? `
@@ -2788,11 +2801,11 @@
                         <div class="user-header">
                             <div class="user-info-main">
                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem;">
-                                    <div class="user-name">${user.username}</div>
-                                    <div class="user-role ${roleClass}">${user.role}</div>
+                                    <div class="user-name">${escapeHTML(user.username)}</div>
+                                    <div class="user-role ${roleClass}">${escapeHTML(user.role)}</div>
                                 </div>
                                 <div class="user-email" style="margin-bottom: 0.5rem;">
-                                    <i class="fas fa-envelope"></i> ${user.email}
+                                    <i class="fas fa-envelope"></i> ${escapeHTML(user.email)}
                                 </div>
                                 
                                 ${studentInfoHTML}
@@ -3034,13 +3047,13 @@
                         <div class="approval-item">
                             <div class="approval-header">
                                 <div>
-                                    <div class="approval-title">${note.title}</div>
+                                    <div class="approval-title">${escapeHTML(note.title)}</div>
                                     <div class="approval-meta">
-                                        <i class="fas fa-book"></i> ${note.course_name} • 
-                                        <i class="fas fa-user"></i> ${note.uploaded_by_name} • 
+                                        <i class="fas fa-book"></i> ${escapeHTML(note.course_name)} &bull; 
+                                        <i class="fas fa-user"></i> ${escapeHTML(note.uploaded_by_name)} &bull; 
                                         <i class="fas fa-calendar"></i> ${new Date(note.uploaded_at).toLocaleDateString()}
                                     </div>
-                                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${note.description}</p>
+                                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${escapeHTML(note.description)}</p>
                                 </div>
                                 ${fileIcon}
                             </div>
