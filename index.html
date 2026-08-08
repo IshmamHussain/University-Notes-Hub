@@ -2428,54 +2428,76 @@
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('description', description);
-            formData.append('course_id', currentCourseId);
-            formData.append('noteFile', fileInput.files[0]);
+            const file = fileInput.files[0];
 
             try {
-                const response = await fetch(`${API_BASE}/upload-note`, {
+                // Step 1: Request a signed upload URL
+                showMessage('courseMessage', 'Generating secure upload token...', 'success');
+                const signRes = await apiFetch(`${API_BASE}/upload-note/sign`, {
                     method: 'POST',
-                    body: formData,
-                    credentials: 'include'
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileName: file.name })
                 });
 
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('Upload successful:', result);
-                    document.getElementById('uploadForm').reset();
-
-                    if (result.status === 'pending') {
-                        showUploadNotification('Upload successful! Your file is now pending approval. You can track the status and cancel the request if needed.');
-                    }
-                    else {
-                        showUploadNotification('Upload successful! Your file has been approved and is now available.');
-                    }
-
-                    await viewCourse(currentCourseId);
-
-                } else {
-                    const errorText = await response.text();
-                    let errorMessage = 'Unknown error';
-                    try {
-                        const errorJson = JSON.parse(errorText);
-                        errorMessage = errorJson.error || errorJson.message || 'Unknown error';
-                    } catch (e) {
-                        if (response.status === 413) {
-                            errorMessage = 'File is too large! Maximum allowed size is 4.5MB on Vercel.';
-                        } else if (response.status === 504) {
-                            errorMessage = 'Upload timed out. Your connection might be too slow.';
-                        } else {
-                            errorMessage = `Server returned HTTP ${response.status}.`;
-                        }
-                    }
-                    console.error('Upload failed:', errorMessage, errorText);
-                    showMessage('courseMessage', 'Upload failed: ' + errorMessage, 'error');
+                if (!signRes.ok) {
+                    const err = await signRes.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to get upload token');
                 }
+
+                const { signedUrl, uniqueFileName, publicUrl } = await signRes.json();
+
+                // Step 2: Upload file directly to Supabase Storage
+                showMessage('courseMessage', 'Uploading file securely (bypassing limits)...', 'success');
+                
+                // Supabase JS uploadToSignedUrl uses a FormData with an empty field name for the blob
+                const formData = new FormData();
+                formData.append('cacheControl', '3600');
+                formData.append('', file);
+                
+                const uploadRes = await fetch(signedUrl, {
+                    method: 'PUT',
+                    body: formData
+                });
+
+                if (!uploadRes.ok) {
+                    throw new Error(`Storage upload failed with HTTP ${uploadRes.status}`);
+                }
+
+                // Step 3: Confirm upload and save metadata to the database
+                showMessage('courseMessage', 'Saving note metadata...', 'success');
+                const confirmRes = await apiFetch(`${API_BASE}/upload-note/confirm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        description,
+                        course_id: currentCourseId,
+                        file_name: file.name,
+                        file_path: publicUrl,
+                        file_size: file.size
+                    })
+                });
+
+                if (!confirmRes.ok) {
+                    const err = await confirmRes.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to save note metadata');
+                }
+
+                const result = await confirmRes.json();
+                
+                document.getElementById('uploadForm').reset();
+                
+                if (result.status === 'pending') {
+                    showUploadNotification('Upload successful! Your file is now pending approval. You can track the status and cancel the request if needed.');
+                } else {
+                    showUploadNotification('Upload successful! Your file has been approved and is now available.');
+                }
+
+                await viewCourse(currentCourseId);
+
             } catch (error) {
-                console.error('Upload network error:', error);
-                showMessage('courseMessage', 'Network error. Please check your connection and try again.', 'error');
+                console.error('Upload error:', error);
+                showMessage('courseMessage', 'Upload failed: ' + error.message, 'error');
             }
         }
 

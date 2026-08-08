@@ -1,7 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
@@ -41,32 +40,7 @@ app.use(cookieSession({
     maxAge: 24 * 60 * 60 * 1000
 }));
 
-const storage = multer.memoryStorage();
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 4.5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
-        const allowedMimeTypes = [
-            'application/pdf', 
-            'application/msword', 
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/plain',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-        ];
-        const fileExt = path.extname(file.originalname).toLowerCase();
-        if (allowedTypes.includes(fileExt)) {
-            if (allowedMimeTypes.includes(file.mimetype) || file.mimetype === 'application/octet-stream' || file.mimetype === 'application/x-zip-compressed') {
-                cb(null, true);
-            } else {
-                cb(new Error(`Invalid MIME type: ${file.mimetype}`));
-            }
-        } else {
-            cb(new Error('Only document files are allowed! Invalid extension.'));
-        }
-    }
-});
+
 
 app.use((req, res, next) => {
     console.log('🔐 Session check:', {
@@ -292,35 +266,66 @@ app.get('/course/:id', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/upload-note', requireAuth, upload.single('noteFile'), async (req, res) => {
-    const { title, description, course_id } = req.body;
-    if (!req.file) return res.status(400).json({ error: 'Please select a file to upload' });
+app.post('/upload-note/sign', requireAuth, express.json(), async (req, res) => {
+    const { fileName } = req.body;
+    if (!fileName) return res.status(400).json({ error: 'File name is required' });
 
     try {
-        const fileExt = path.extname(req.file.originalname).toLowerCase();
+        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
+        const fileExt = path.extname(fileName).toLowerCase();
+        
+        if (!allowedTypes.includes(fileExt)) {
+            return res.status(400).json({ error: 'Only document files are allowed! Invalid extension.' });
+        }
+
         const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExt}`;
 
-        const { error: storageError } = await supabase.storage
+        // Create a signed upload URL valid for 60 seconds
+        const { data, error } = await supabase.storage
             .from('notes')
-            .upload(uniqueFileName, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+            .createSignedUploadUrl(uniqueFileName);
 
-        if (storageError) throw new Error('Supabase Storage Error: ' + storageError.message);
+        if (error) throw new Error('Failed to generate upload URL: ' + error.message);
 
+        // Get the public URL for the final location
         const { data: urlData } = supabase.storage.from('notes').getPublicUrl(uniqueFileName);
+
+        res.json({
+            signedUrl: data.signedUrl,
+            uniqueFileName,
+            publicUrl: urlData.publicUrl
+        });
+    } catch (error) {
+        console.error('Sign upload error:', error);
+        res.status(500).json({ error: 'Failed to generate upload URL' });
+    }
+});
+
+app.post('/upload-note/confirm', requireAuth, express.json(), async (req, res) => {
+    const { title, description, course_id, file_name, file_path, file_size } = req.body;
+    
+    if (!title || !course_id || !file_name || !file_path) {
+        return res.status(400).json({ error: 'Missing required note metadata' });
+    }
+
+    try {
         const status = req.session.user.role === 'admin' ? 'approved' : 'pending';
 
         const { error: dbError } = await supabase.from('notes').insert([{
-            title, description, file_name: req.file.originalname, file_path: urlData.publicUrl,
-            file_size: req.file.size, course_id, uploaded_by: req.session.user.id, status
+            title, description, file_name, file_path, file_size, course_id, 
+            uploaded_by: req.session.user.id, status
         }]);
 
         if (dbError) throw dbError;
 
-        const message = status === 'approved' ? 'Note uploaded successfully!' : 'Note uploaded successfully! It will be available after admin approval.';
+        const message = status === 'approved' 
+            ? 'Note uploaded successfully!' 
+            : 'Note uploaded successfully! It will be available after admin approval.';
+            
         res.json({ success: true, message, status });
     } catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Failed to upload note' });
+        console.error('Upload confirm error:', error);
+        res.status(500).json({ error: 'Failed to confirm note upload' });
     }
 });
 
