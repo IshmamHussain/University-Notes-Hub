@@ -3058,6 +3058,8 @@
 
         async function deleteUser(userId, username) {
             if (confirm(`Are you sure you want to delete the user "${username}"? This action cannot be undone.`)) {
+                const row = document.getElementById(`user-row-${userId}`);
+                if (row) row.style.display = 'none';
                 try {
                     console.log(`🗑️ Deleting user ${userId}...`);
                     const response = await apiFetch(`${API_BASE}/admin/users/${userId}`, {
@@ -3072,9 +3074,12 @@
                     const result = await response.json();
                     showMessage('usersManagementMessage', 'User deleted successfully!', 'success');
 
+                    // Note: loadUsers will refresh the list, so we might not even need it if we trust optimistic UI
+                    // but keeping it ensures state consistency.
                     await loadUsers();
 
                 } catch (error) {
+                    if (row) row.style.display = '';
                     console.error('❌ Delete user error:', error);
                     showMessage('usersManagementMessage', `Failed to delete user: ${error.message}`, 'error');
                 }
@@ -3158,6 +3163,9 @@
         }
 
         async function approveNote(noteId) {
+            const btn = window.event ? window.event.target.closest('button') : null;
+            const item = btn ? btn.closest('.approval-item') : null;
+            if (item) item.style.display = 'none';
             try {
                 console.log('Approving note:', noteId);
                 const response = await apiFetch(`${API_BASE}/admin/approve-note/${noteId}`, {
@@ -3171,9 +3179,11 @@
 
                 const result = await response.json();
                 showMessage('adminMessage', 'Note approved successfully!', 'success');
+                // Optmistic UI handles immediate visual change, background reload keeps state fresh
                 loadPendingApprovals();
                 loadAdminPanel();
             } catch (error) {
+                if (item) item.style.display = '';
                 console.error('Approve note error:', error);
                 showMessage('adminMessage', `Failed to approve note: ${error.message}`, 'error');
             }
@@ -3181,6 +3191,9 @@
 
         async function rejectNote(noteId) {
             if (confirm('Are you sure you want to reject this note?')) {
+                const btn = window.event ? window.event.target.closest('button') : null;
+                const item = btn ? btn.closest('.approval-item') : null;
+                if (item) item.style.display = 'none';
                 try {
                     console.log('Rejecting note:', noteId);
                     const response = await apiFetch(`${API_BASE}/admin/reject-note/${noteId}`, {
@@ -3197,6 +3210,7 @@
                     loadPendingApprovals();
                     loadAdminPanel();
                 } catch (error) {
+                    if (item) item.style.display = '';
                     console.error('Reject note error:', error);
                     showMessage('adminMessage', `Failed to reject note: ${error.message}`, 'error');
                 }
@@ -3275,6 +3289,9 @@
 
         async function deleteDepartment(deptId, deptName) {
             if (confirm(`Are you sure you want to delete the department "${deptName}"? This action cannot be undone.`)) {
+                const btn = window.event ? window.event.target.closest('button') : null;
+                const card = btn ? btn.closest('.department-card') : null;
+                if (card) card.style.display = 'none';
                 try {
                     const response = await apiFetch(`${API_BASE}/admin/departments/${deptId}`, {
                         method: 'DELETE'
@@ -3286,9 +3303,11 @@
                         showMessage('adminMessage', 'Department deleted successfully!', 'success');
                         loadAdminPanel(); // Reload the admin panel
                     } else {
+                        if (card) card.style.display = '';
                         showMessage('adminMessage', 'Delete failed: ' + result.error, 'error');
                     }
                 } catch (error) {
+                    if (card) card.style.display = '';
                     console.error('Delete department error:', error);
                     showMessage('adminMessage', 'Failed to delete department', 'error');
                 }
@@ -3297,6 +3316,9 @@
 
         async function deleteCourse(courseId, courseName) {
             if (confirm(`Are you sure you want to delete the course "${courseName}"? This action cannot be undone.`)) {
+                const btn = window.event ? window.event.target.closest('button') : null;
+                const card = btn ? btn.closest('tr') : null; // courses are likely in a table or list
+                if (card) card.style.display = 'none';
                 try {
                     const response = await apiFetch(`${API_BASE}/admin/courses/${courseId}`, {
                         method: 'DELETE'
@@ -3308,9 +3330,11 @@
                         showMessage('adminMessage', 'Course deleted successfully!', 'success');
                         loadAdminPanel();
                     } else {
+                        if (card) card.style.display = '';
                         showMessage('adminMessage', 'Delete failed: ' + result.error, 'error');
                     }
                 } catch (error) {
+                    if (card) card.style.display = '';
                     console.error('Delete course error:', error);
                     showMessage('adminMessage', 'Failed to delete course', 'error');
                 }
@@ -3380,30 +3404,7 @@
             }
         }
 
-        async function deleteUser(userId, username) {
-            if (confirm(`Are you sure you want to delete the user "${username}"? This action cannot be undone.`)) {
-                try {
-                    console.log(`🗑️ Deleting user ${userId}...`);
-                    const response = await apiFetch(`${API_BASE}/admin/users/${userId}`, {
-                        method: 'DELETE'
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `HTTP ${response.status}`);
-                    }
-
-                    const result = await response.json();
-                    showMessage('usersManagementMessage', 'User deleted successfully!', 'success');
-
-                    await loadUsers();
-
-                } catch (error) {
-                    console.error('❌ Delete user error:', error);
-                    showMessage('usersManagementMessage', `Failed to delete user: ${error.message}`, 'error');
-                }
-            }
-        }
+        // Removed duplicate deleteUser definition
 
         function formatStudentId(input) {
             let value = input.value.replace(/\D/g, '');
