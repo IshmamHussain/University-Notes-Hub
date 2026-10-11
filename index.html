@@ -5,14 +5,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>University Notes Hub | Share & Learn</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23fde047'/%3E%3Cstop offset='50%25' stop-color='%23facc15'/%3E%3Cstop offset='100%25' stop-color='%23eab308'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='24' fill='url(%23grad)'/%3E%3Cpath fill='%23060608' transform='translate(18, 24.4) scale(0.1)' d='M320 32c-8.1 0-16.1 1.4-23.7 4.1L15.8 137.4C6.3 140.9 0 149.9 0 160s6.3 19.1 15.8 22.6l57.9 20.9C57.3 229.3 48 259.8 48 291.9v28.1c0 28.4-10.8 57.7-22.3 80.8c-6.5 13-13.9 25.8-22.5 37.6C0 442.7-.9 448.3 .9 453.4s6 8.9 11.2 10.2l64 16c4.2 1.1 8.7 .3 12.4-2s6.3-6.1 7.1-10.4c8.6-42.8 4.3-81.2-2.1-108.7C90.3 344.3 86 329.8 80 316.5V291.9c0-30.2 10.2-58.7 27.9-81.5c12.9-15.5 29.6-28 49.2-35.7l152-55c8.2-3 17.2-3 25.4 0l152 55c19.6 7.7 36.3 20.2 49.2 35.7c17.7 22.8 27.9 51.3 27.9 81.5v24.6c-6 13.3-10.3 27.8-13.5 41.9c-6.4 27.5-10.7 65.9-2.1 108.7c.8 4.3 3.4 8.1 7.1 10.4s8.2 3.1 12.4 2l64-16c5.2-1.3 9.4-5.1 11.2-10.2s.9-10.7-2.4-15c-8.6-11.8-16-24.6-22.5-37.6C586.8 377.7 576 348.3 576 319.9V291.9c0-32.1-9.3-62.6-25.7-88.5l57.9-20.9c9.5-3.5 15.8-12.5 15.8-22.6s-6.3-19.1-15.8-22.6L343.7 36.1C336.1 33.4 328.1 32 320 32zM128 408c0 35.3 86 72 192 72s192-36.7 192-72L496.7 262.6 354.5 314c-11.1 4-22.8 6-34.5 6s-23.5-2-34.5-6L143.3 262.6 128 408z'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23fde047'/%3E%3Cstop offset='50%25' stop-color='%23facc15'/%3E%3Cstop offset='100%25' stop-color='%23eab308'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='24' fill='url(%23grad)'/%3E%3Cpath fill='%23060608' transform='translate(18, 24.4) scale(0.1)' d='M320 32c-8.1 0-16.1 1.4-23.7 4.1L15.8 137.4C6.3 140.9 0 149.9 0 160s6.3 19.1 15.8 22.6l57.9 20.9C57.3 229.3 48 259.8 48 291.9v28.1c0 28.4-10.8 57.7-22.3 80.8c-6.5 13-13.9 25.8-22.5 37.6C0 442.7-.9 448.3 .9 453.4s6 8.9 11.2 10.2l64 16c4.2 1.1 8.7 .3 12.4-2s6.3-6.1 7.1-10.4c8.6-42.8 4.3-81.2-2.1-108.7C90.3 344.3 86 329.8 80 316.5V291.9c0-30.2 10.2-58.7 27.9-81.5c12.9-15.5 29.6-28 49.2-35.7l152-55c8.2-3 17.2-3 25.4 0l152 55c19.6 7.7 36.3 20.2 49.2 35.7c17.7 22.8 27.9 51.3 27.9 81.5v24.6c-6 13.3-10.3 27.8-13.5 41.9c-6.4 27.5-10.7 65.9-2.1 108.7c.8 4.3 3.4 8.1 7.1 10.4s8.2 3.1 12.4 2l64-16c5.2-1.3 9.4-5.1 11.2-10.2s.9-10.7-2.4-15c-8.6-11.8-16-24.6-22.5-37.6C586.8 377.7 576 348.3 576 319.9V291.9c0-32.1-9.3-62.6-25.7-88.5l57.9-20.9c9.5-3.5 15.8-12.5 15.8-22.6s-6.3-19.1-15.8-22.6L343.7 36.1C336.1 33.4 328.1 32 320 32zM128 408c0 35.3 86 72 192 72s192-36.7 192-72L496.7 262.6 354.5 314c-11.1 4-22.8 6-34.5 6s-23.5-2-34.5-6L143.3 262.6 128 408z'/%3E%3C/svg%3E">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/favicon.svg">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <style>
         :root {
@@ -55,9 +57,9 @@
             --bg-primary: #060608;
             --bg-secondary: #0d0d11;
             --bg-gradient: radial-gradient(ellipse at 20% 0%, rgba(234, 179, 8, 0.15) 0%, transparent 60%),
-                           radial-gradient(ellipse at 80% 15%, rgba(250, 204, 21, 0.09) 0%, transparent 50%),
-                           radial-gradient(ellipse at 50% 85%, rgba(202, 138, 4, 0.07) 0%, transparent 45%),
-                           #060608;
+                radial-gradient(ellipse at 80% 15%, rgba(250, 204, 21, 0.09) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 85%, rgba(202, 138, 4, 0.07) 0%, transparent 45%),
+                #060608;
             --text-primary: #ffffff;
             --text-secondary: #a1a1aa;
             --text-muted: #71717a;
@@ -93,9 +95,9 @@
             --bg-primary: #060608;
             --bg-secondary: #0d0d11;
             --bg-gradient: radial-gradient(ellipse at 20% 0%, rgba(234, 179, 8, 0.15) 0%, transparent 60%),
-                           radial-gradient(ellipse at 80% 15%, rgba(250, 204, 21, 0.1) 0%, transparent 50%),
-                           radial-gradient(ellipse at 50% 85%, rgba(202, 138, 4, 0.07) 0%, transparent 45%),
-                           #060608;
+                radial-gradient(ellipse at 80% 15%, rgba(250, 204, 21, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 85%, rgba(202, 138, 4, 0.07) 0%, transparent 45%),
+                #060608;
             --text-primary: #ffffff;
             --text-secondary: #a1a1aa;
             --text-muted: #71717a;
@@ -124,14 +126,17 @@
             width: 10px;
             height: 10px;
         }
+
         ::-webkit-scrollbar-track {
             background: var(--bg-primary);
         }
+
         ::-webkit-scrollbar-thumb {
             background: rgba(234, 179, 8, 0.3);
             border-radius: var(--radius-full);
             border: 2px solid var(--bg-primary);
         }
+
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(250, 204, 21, 0.55);
         }
@@ -524,15 +529,25 @@
             width: 200%;
             height: 200%;
             background: radial-gradient(circle at 30% 40%, rgba(234, 179, 8, 0.16) 0%, transparent 50%),
-                        radial-gradient(circle at 70% 60%, rgba(250, 204, 21, 0.1) 0%, transparent 50%),
-                        radial-gradient(circle at 50% 80%, rgba(202, 138, 4, 0.08) 0%, transparent 40%);
+                radial-gradient(circle at 70% 60%, rgba(250, 204, 21, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(202, 138, 4, 0.08) 0%, transparent 40%);
             animation: meshShift 15s ease-in-out infinite;
         }
 
         @keyframes meshShift {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            33% { transform: translate(2%, -2%) rotate(1deg); }
-            66% { transform: translate(-1%, 1%) rotate(-0.5deg); }
+
+            0%,
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            33% {
+                transform: translate(2%, -2%) rotate(1deg);
+            }
+
+            66% {
+                transform: translate(-1%, 1%) rotate(-0.5deg);
+            }
         }
 
         .auth-brand-content {
@@ -611,54 +626,103 @@
         }
 
         .auth-float-item:nth-child(1) {
-            width: 56px; height: 56px; font-size: 1.3rem;
-            top: 12%; right: 15%;
+            width: 56px;
+            height: 56px;
+            font-size: 1.3rem;
+            top: 12%;
+            right: 15%;
             background: rgba(234, 179, 8, 0.16);
             animation: authFloat1 8s ease-in-out infinite;
         }
+
         .auth-float-item:nth-child(2) {
-            width: 48px; height: 48px; font-size: 1.1rem;
-            top: 30%; right: 8%;
+            width: 48px;
+            height: 48px;
+            font-size: 1.1rem;
+            top: 30%;
+            right: 8%;
             background: rgba(250, 204, 21, 0.12);
             animation: authFloat2 10s ease-in-out infinite;
         }
+
         .auth-float-item:nth-child(3) {
-            width: 44px; height: 44px; font-size: 1rem;
-            bottom: 25%; right: 22%;
+            width: 44px;
+            height: 44px;
+            font-size: 1rem;
+            bottom: 25%;
+            right: 22%;
             background: rgba(202, 138, 4, 0.12);
             animation: authFloat3 9s ease-in-out infinite;
         }
+
         .auth-float-item:nth-child(4) {
-            width: 52px; height: 52px; font-size: 1.2rem;
-            bottom: 12%; left: 10%;
+            width: 52px;
+            height: 52px;
+            font-size: 1.2rem;
+            bottom: 12%;
+            left: 10%;
             background: rgba(234, 179, 8, 0.14);
             animation: authFloat1 11s ease-in-out infinite reverse;
         }
+
         .auth-float-item:nth-child(5) {
-            width: 40px; height: 40px; font-size: 0.9rem;
-            top: 55%; right: 35%;
+            width: 40px;
+            height: 40px;
+            font-size: 0.9rem;
+            top: 55%;
+            right: 35%;
             background: rgba(250, 204, 21, 0.1);
             animation: authFloat2 7s ease-in-out infinite reverse;
         }
+
         .auth-float-item:nth-child(6) {
-            width: 36px; height: 36px; font-size: 0.85rem;
-            top: 18%; left: 25%;
+            width: 36px;
+            height: 36px;
+            font-size: 0.85rem;
+            top: 18%;
+            left: 25%;
             background: rgba(202, 138, 4, 0.1);
             animation: authFloat3 12s ease-in-out infinite;
         }
 
         @keyframes authFloat1 {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(8deg); }
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            50% {
+                transform: translateY(-20px) rotate(8deg);
+            }
         }
+
         @keyframes authFloat2 {
-            0%, 100% { transform: translateY(0) translateX(0); }
-            50% { transform: translateY(-15px) translateX(10px); }
+
+            0%,
+            100% {
+                transform: translateY(0) translateX(0);
+            }
+
+            50% {
+                transform: translateY(-15px) translateX(10px);
+            }
         }
+
         @keyframes authFloat3 {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            33% { transform: translateY(-12px) rotate(-5deg); }
-            66% { transform: translateY(8px) rotate(3deg); }
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            33% {
+                transform: translateY(-12px) rotate(-5deg);
+            }
+
+            66% {
+                transform: translateY(8px) rotate(3deg);
+            }
         }
 
         /* Decorative grid pattern on left panel */
@@ -669,22 +733,18 @@
             left: 0;
             width: 100%;
             height: 40%;
-            background: repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 39px,
-                rgba(250, 204, 21, 0.03) 39px,
-                rgba(250, 204, 21, 0.03) 40px
-            ),
-            repeating-linear-gradient(
-                90deg,
-                transparent,
-                transparent 39px,
-                rgba(250, 204, 21, 0.03) 39px,
-                rgba(250, 204, 21, 0.03) 40px
-            );
-            mask-image: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%);
-            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%);
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 39px,
+                    rgba(250, 204, 21, 0.03) 39px,
+                    rgba(250, 204, 21, 0.03) 40px),
+                repeating-linear-gradient(90deg,
+                    transparent,
+                    transparent 39px,
+                    rgba(250, 204, 21, 0.03) 39px,
+                    rgba(250, 204, 21, 0.03) 40px);
+            mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 100%);
             pointer-events: none;
         }
 
@@ -778,7 +838,9 @@
             font-size: 0.95rem;
         }
 
-        input, textarea, select {
+        input,
+        textarea,
+        select {
             width: 100%;
             padding: 12px 15px;
             border: 1px solid var(--border-color);
@@ -789,7 +851,9 @@
             font-size: 1rem;
         }
 
-        input:focus, textarea:focus, select:focus {
+        input:focus,
+        textarea:focus,
+        select:focus {
             outline: none;
             border-color: #facc15;
             box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.25);
@@ -1753,6 +1817,7 @@
                 opacity: 0;
                 transform: translateY(40px) scale(0.96);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
@@ -2118,6 +2183,7 @@
                 opacity: 0;
                 transform: translateY(16px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -2129,6 +2195,7 @@
                 opacity: 0;
                 transform: translateY(40px) scale(0.98);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
@@ -2140,6 +2207,7 @@
                 opacity: 0;
                 transform: translateY(-30px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -2151,6 +2219,7 @@
                 opacity: 0;
                 transform: translateY(30px) scale(0.95);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
@@ -2161,9 +2230,11 @@
             0% {
                 transform: scale(1);
             }
+
             50% {
                 transform: scale(1.05);
             }
+
             100% {
                 transform: scale(1);
             }
@@ -2196,7 +2267,7 @@
             color: white;
             border-radius: 12px;
             transition: all 0.3s ease;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .input-group input::placeholder {
@@ -2206,11 +2277,11 @@
         .input-group input:focus {
             background: rgba(10, 10, 14, 0.95);
             border-color: #facc15;
-            box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.25), inset 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.25), inset 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
-        .input-group input:focus + .input-icon,
-        .input-group input:focus ~ .input-icon {
+        .input-group input:focus+.input-icon,
+        .input-group input:focus~.input-icon {
             color: #facc15;
             filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.7));
         }
@@ -2261,13 +2332,18 @@
             left: -100%;
             width: 200%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
             animation: authShimmer 3s ease-in-out infinite;
         }
 
         @keyframes authShimmer {
-            0% { transform: translateX(-50%); }
-            100% { transform: translateX(50%); }
+            0% {
+                transform: translateX(-50%);
+            }
+
+            100% {
+                transform: translateX(50%);
+            }
         }
 
         .btn-auth-submit:hover {
@@ -2310,13 +2386,16 @@
             .auth-container {
                 grid-template-columns: 1fr;
             }
+
             .auth-brand {
                 display: none;
             }
+
             .auth-form-panel {
                 min-height: 100vh;
                 background: #060608;
             }
+
             .auth-card {
                 max-width: 420px;
                 background: rgba(14, 14, 18, 0.92);
@@ -2326,35 +2405,45 @@
                 border-radius: 20px;
                 padding: 2.5rem;
             }
+
             .auth-header {
                 text-align: center;
             }
+
             .auth-icon {
                 margin: 0 auto 1.2rem;
             }
+
             .auth-title {
                 color: white;
             }
+
             .auth-subtitle {
                 color: #a1a1aa;
             }
+
             .form-label {
                 color: #fef08a;
             }
+
             .auth-footer a {
                 color: #a1a1aa;
             }
+
             .auth-footer a span {
                 color: #facc15;
             }
+
             .auth-footer {
                 border-top-color: rgba(234, 179, 8, 0.2);
             }
+
             input {
                 background: rgba(10, 10, 14, 0.85);
                 border-color: rgba(234, 179, 8, 0.25);
                 color: white;
             }
+
             input::placeholder {
                 color: #71717a;
             }
@@ -2522,7 +2611,8 @@
                     </div>
                     <h2>Share Knowledge,<br><span>Shape Futures</span></h2>
                     <p class="auth-brand-tagline">
-                        Access thousands of curated notes, collaborate with peers, and excel in your academic journey — all in one place.
+                        Access thousands of curated notes, collaborate with peers, and excel in your academic journey —
+                        all in one place.
                     </p>
                 </div>
             </div>
@@ -2551,10 +2641,11 @@
                         <div class="form-group">
                             <label class="form-label">Password</label>
                             <div class="input-group">
-                                <input type="password" class="form-input" id="password" placeholder="Enter your password"
-                                    required>
+                                <input type="password" class="form-input" id="password"
+                                    placeholder="Enter your password" required>
                                 <i class="fas fa-lock input-icon"></i>
-                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)">
+                                <button type="button" class="password-toggle"
+                                    onclick="togglePasswordVisibility('password', this)">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
@@ -2620,14 +2711,16 @@
                             <div class="form-group">
                                 <label class="form-label">Username</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-input" id="regUsername" placeholder="Choose a username" required>
+                                    <input type="text" class="form-input" id="regUsername"
+                                        placeholder="Choose a username" required>
                                     <i class="fas fa-user input-icon"></i>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Email Address</label>
                                 <div class="input-group">
-                                    <input type="email" class="form-input" id="regEmail" placeholder="University email" required>
+                                    <input type="email" class="form-input" id="regEmail" placeholder="University email"
+                                        required>
                                     <i class="fas fa-envelope input-icon"></i>
                                 </div>
                             </div>
@@ -2637,14 +2730,16 @@
                             <div class="form-group">
                                 <label class="form-label">Password</label>
                                 <div class="input-group">
-                                    <input type="password" class="form-input" id="regPassword" placeholder="Create a password" required>
+                                    <input type="password" class="form-input" id="regPassword"
+                                        placeholder="Create a password" required>
                                     <i class="fas fa-lock input-icon"></i>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Confirm Password</label>
                                 <div class="input-group">
-                                    <input type="password" class="form-input" id="regConfirmPassword" placeholder="Confirm password" required>
+                                    <input type="password" class="form-input" id="regConfirmPassword"
+                                        placeholder="Confirm password" required>
                                     <i class="fas fa-shield-alt input-icon"></i>
                                 </div>
                             </div>
@@ -3033,7 +3128,7 @@
 
         function escapeHTML(str) {
             if (str === null || str === undefined) return '';
-            return String(str).replace(/[&<>'"]/g, 
+            return String(str).replace(/[&<>'"]/g,
                 tag => ({
                     '&': '&amp;',
                     '<': '&lt;',
@@ -3238,11 +3333,46 @@
                     showPage('dashboard');
                     showMessage('loginError', 'Login successful!', 'success');
                 } else {
-                    showMessage('loginError', result.error, 'error');
+                    if (result.unverified && result.email) {
+                        const msgEl = document.getElementById('loginError');
+                        msgEl.innerHTML = `
+                            <div style="width: 100%;">
+                                <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+                                    <i class="fas fa-envelope" style="color: #facc15; margin-top: 3px;"></i>
+                                    <span>${escapeHTML(result.error)}</span>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-small" style="font-size: 0.82rem; padding: 5px 12px; margin-top: 6px;" onclick="resendVerification('${escapeHTML(result.email)}')">
+                                    <i class="fas fa-paper-plane"></i> Resend Verification Email
+                                </button>
+                            </div>
+                        `;
+                        msgEl.className = 'message message-warning';
+                        msgEl.style.display = 'flex';
+                    } else {
+                        showMessage('loginError', result.error, 'error');
+                    }
                 }
             } catch (error) {
                 console.error('Login error:', error);
                 showMessage('loginError', 'Login failed. Please try again.', 'error');
+            }
+        }
+
+        async function resendVerification(email) {
+            try {
+                showMessage('loginError', 'Resending verification email...', 'warning');
+                const response = await apiFetch(`${API_BASE}/resend-verification`, {
+                    method: 'POST',
+                    body: JSON.stringify({ email })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showMessage('loginError', result.message || 'Verification email resent! Check your inbox.', 'success');
+                } else {
+                    showMessage('loginError', result.error || 'Failed to resend verification email.', 'error');
+                }
+            } catch (err) {
+                showMessage('loginError', 'Failed to resend verification email.', 'error');
             }
         }
 
@@ -3550,12 +3680,12 @@
 
                 // Step 2: Upload file directly to Supabase Storage
                 showMessage('courseMessage', 'Uploading file securely (bypassing limits)...', 'success');
-                
+
                 // Supabase JS uploadToSignedUrl uses a FormData with an empty field name for the blob
                 const formData = new FormData();
                 formData.append('cacheControl', '3600');
                 formData.append('', file);
-                
+
                 const uploadRes = await fetch(signedUrl, {
                     method: 'PUT',
                     body: formData
@@ -3586,9 +3716,9 @@
                 }
 
                 const result = await confirmRes.json();
-                
+
                 document.getElementById('uploadForm').reset();
-                
+
                 if (result.status === 'pending') {
                     showUploadNotification('Upload successful! Your file is now pending approval. You can track the status and cancel the request if needed.');
                 } else {
@@ -3710,21 +3840,21 @@
             try {
                 showMessage('dashboardMessage', 'Preparing download...', 'success');
                 const response = await apiFetch(`${API_BASE}/download-note/${noteId}`);
-                
+
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.error || 'Failed to download');
                 }
-                
+
                 const data = await response.json();
-                
+
                 const a = document.createElement('a');
                 a.href = data.url;
                 a.download = '';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-                
+
                 showMessage('dashboardMessage', 'Download started!', 'success');
             } catch (error) {
                 console.error('Download error:', error);

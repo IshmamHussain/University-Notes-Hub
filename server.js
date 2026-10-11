@@ -142,10 +142,10 @@ app.post('/login', async (req, res) => {
         // Check if loginQuery is an email or username
         let userRecord;
         if (loginQuery.includes('@')) {
-            const { data } = await supabase.from('users').select('id, username, password, role').eq('email', loginQuery);
+            const { data } = await supabase.from('users').select('id, username, email, password, role').eq('email', loginQuery);
             userRecord = data ? data[0] : null;
         } else {
-            const { data } = await supabase.from('users').select('id, username, password, role').eq('username', loginQuery);
+            const { data } = await supabase.from('users').select('id, username, email, password, role').eq('username', loginQuery);
             userRecord = data ? data[0] : null;
         }
 
@@ -157,6 +157,48 @@ app.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, userRecord.password);
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid login credentials' });
+        }
+
+        // Ensure email is verified in Supabase Auth before allowing login
+        if (hasSupabase && userRecord.email && userRecord.role !== 'admin') {
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                email: userRecord.email,
+                password
+            });
+
+            if (authError) {
+                const errMsg = (authError.message || '').toLowerCase();
+                if (errMsg.includes('email not confirmed') || errMsg.includes('not confirmed') || authError.code === 'email_not_confirmed') {
+                    return res.status(403).json({
+                        error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
+                        unverified: true,
+                        email: userRecord.email
+                    });
+                }
+
+                // Fallback: inspect user in Supabase Auth via admin API
+                try {
+                    const { data: listData } = await supabase.auth.admin.listUsers();
+                    if (listData && listData.users) {
+                        const authUser = listData.users.find(u => u.email && u.email.toLowerCase() === userRecord.email.toLowerCase());
+                        if (authUser && !authUser.email_confirmed_at) {
+                            return res.status(403).json({
+                                error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
+                                unverified: true,
+                                email: userRecord.email
+                            });
+                        }
+                    }
+                } catch (adminErr) {
+                    console.warn('Admin user lookup warning:', adminErr.message);
+                }
+            } else if (authData && authData.user && !authData.user.email_confirmed_at) {
+                return res.status(403).json({
+                    error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
+                    unverified: true,
+                    email: userRecord.email
+                });
+            }
         }
 
         req.session.user = {
@@ -203,6 +245,34 @@ app.post('/register', async (req, res) => {
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ error: 'Registration failed: ' + error.message });
+    }
+});
+
+app.post('/resend-verification', async (req, res) => {
+    let { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ error: 'Email address is required' });
+    }
+    email = email.trim().toLowerCase();
+
+    try {
+        if (!hasSupabase) {
+            return res.json({ success: true, message: 'Verification email resent (demo mode).' });
+        }
+
+        const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email
+        });
+
+        if (error) {
+            return res.status(400).json({ error: error.message });
+        }
+
+        res.json({ success: true, message: 'Verification email has been resent! Please check your inbox and spam folder.' });
+    } catch (err) {
+        console.error('Resend verification error:', err);
+        res.status(500).json({ error: 'Failed to resend verification email: ' + err.message });
     }
 });
 
