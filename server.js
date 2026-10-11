@@ -36,6 +36,21 @@ app.use((req, res, next) => {
 app.use(express.static('.'));
 app.use('/uploads', express.static('uploads'));
 
+app.get('/favicon.svg', (req, res) => {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.sendFile(path.join(__dirname, 'favicon.svg'));
+});
+
+app.get('/favicon.ico', (req, res) => {
+    const icoPath = path.join(__dirname, 'favicon.ico');
+    if (fs.existsSync(icoPath)) {
+        res.setHeader('Content-Type', 'image/x-icon');
+        return res.sendFile(icoPath);
+    }
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.sendFile(path.join(__dirname, 'favicon.svg'));
+});
+
 if (!process.env.SESSION_SECRET) {
     console.warn("WARNING: SESSION_SECRET is not set! Using fallback secret.");
 }
