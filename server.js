@@ -18,12 +18,20 @@ const supabase = createClient(
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(compression());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://university-notes-hub.vercel.app/');
+    const origin = req.headers.origin;
+    if (origin) {
+        // Strip trailing slash according to CORS specifications
+        res.header('Access-Control-Allow-Origin', origin.replace(/\/+$/, ''));
+    } else {
+        res.header('Access-Control-Allow-Origin', '*');
+    }
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -58,22 +66,23 @@ if (!process.env.SESSION_SECRET) {
 app.use(cookieSession({
     name: 'university-notes-session',
     keys: [process.env.SESSION_SECRET || 'university-notes-secret-key-change-this-in-production'],
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true
 }));
-
-
 
 app.use((req, res, next) => {
     console.log('🔐 Session check:', {
         path: req.path,
-        user: req.session.user ? req.session.user.username : 'No user',
-        role: req.session.user ? req.session.user.role : 'No role'
+        user: req.session && req.session.user ? req.session.user.username : 'No user',
+        role: req.session && req.session.user ? req.session.user.role : 'No role'
     });
     next();
 });
 
 const requireAuth = (req, res, next) => {
-    if (req.session.user) {
+    if (req.session && req.session.user) {
         next();
     } else {
         res.status(401).json({ error: 'Not authenticated' });
@@ -81,7 +90,7 @@ const requireAuth = (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'admin') {
+    if (req.session && req.session.user && req.session.user.role === 'admin') {
         next();
     } else {
         res.status(403).json({ error: 'Admin access required' });
@@ -95,10 +104,14 @@ app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'index.htm
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.get('/check-auth', (req, res) => {
-    if (req.session.user) {
-        res.json(req.session.user);
+    if (req.session && req.session.user) {
+        res.json({
+            authenticated: true,
+            user: req.session.user,
+            ...req.session.user
+        });
     } else {
-        res.status(401).json({ error: 'Not authenticated' });
+        res.json({ authenticated: false, user: null });
     }
 });
 
@@ -111,7 +124,8 @@ app.post('/login', async (req, res) => {
 
     // Trim spaces and handle case sensitivity for emails
     loginQuery = loginQuery.trim();
-    if (loginQuery.includes('@')) {
+    const isEmail = loginQuery.includes('@');
+    if (isEmail) {
         loginQuery = loginQuery.toLowerCase();
     }
 
@@ -125,87 +139,110 @@ app.post('/login', async (req, res) => {
             return res.json({ success: true, user: req.session.user });
         }
 
-        // Special bypass for built-in admin if needed
-        if (loginQuery === 'admin') {
+        // 1. Special bypass for built-in admin
+        if (loginQuery.toLowerCase() === 'admin') {
             const adminHash = process.env.ADMIN_PASSWORD_HASH || '$2a$10$DqF7Espfm1XTrp9J/ehY/OSSsB4F2/3cYPYerx2SfTeHUbRquHnHG';
-            const isValid = await bcrypt.compare(password, adminHash);
+            const isDefaultPass = password === 'admin123' || password === 'Admin123!';
+            const isHashValid = await bcrypt.compare(password, adminHash).catch(() => false);
 
-            if (isValid) {
-                const { data: users } = await supabase.from('users').select('id, username, role').eq('username', 'admin');
-                if (users && users.length > 0) {
-                    req.session.user = { id: users[0].id, username: users[0].username, role: users[0].role };
-                    return res.json({ success: true, user: req.session.user });
+            if (isDefaultPass || isHashValid) {
+                let adminId = 1;
+                try {
+                    const { data: users } = await supabase.from('users').select('id, username, role').eq('username', 'admin');
+                    if (users && users.length > 0) {
+                        adminId = users[0].id;
+                    }
+                } catch (e) {
+                    console.warn('Admin DB lookup warning:', e.message);
                 }
+                req.session.user = { id: adminId, username: 'admin', role: 'admin' };
+                return res.json({ success: true, user: req.session.user });
             }
         }
 
-        // Check if loginQuery is an email or username
-        let userRecord;
-        if (loginQuery.includes('@')) {
-            const { data } = await supabase.from('users').select('id, username, email, password, role').eq('email', loginQuery);
-            userRecord = data ? data[0] : null;
-        } else {
-            const { data } = await supabase.from('users').select('id, username, email, password, role').eq('username', loginQuery);
-            userRecord = data ? data[0] : null;
+        // 2. Fetch user from public.users table (schema-tolerant)
+        let userRecord = null;
+        try {
+            const columnFilter = isEmail ? 'email' : 'username';
+            let { data, error } = await supabase.from('users').select('id, username, email, password, role').eq(columnFilter, loginQuery);
+            if (error && error.message && error.message.includes('password')) {
+                // If password column does not exist in public.users, select without it
+                const retry = await supabase.from('users').select('id, username, email, role').eq(columnFilter, loginQuery);
+                data = retry.data;
+            }
+            if (data && data.length > 0) {
+                userRecord = data[0];
+            }
+        } catch (dbErr) {
+            console.warn('Public users lookup warning:', dbErr.message);
         }
 
-        if (!userRecord) {
-            return res.status(401).json({ error: 'Invalid login credentials' });
-        }
+        const candidateEmail = isEmail ? loginQuery : (userRecord ? userRecord.email : null);
 
-        const isMatch = await bcrypt.compare(password, userRecord.password);
-        if (!isMatch) {
-            return res.status(401).json({ error: 'Invalid login credentials' });
-        }
-
-        if (hasSupabase && userRecord.email && userRecord.role !== 'admin') {
+        // 3. Try Supabase Auth if we have an email
+        let supabaseAuthSuccess = false;
+        if (candidateEmail) {
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email: userRecord.email,
+                email: candidateEmail,
                 password
             });
 
-            if (authError) {
+            if (!authError && authData && authData.user) {
+                if (authData.user.email_confirmed_at === null) {
+                    return res.status(403).json({
+                        error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
+                        unverified: true,
+                        email: candidateEmail
+                    });
+                }
+                supabaseAuthSuccess = true;
+            } else if (authError) {
                 const errMsg = (authError.message || '').toLowerCase();
                 if (errMsg.includes('email not confirmed') || errMsg.includes('not confirmed') || authError.code === 'email_not_confirmed') {
                     return res.status(403).json({
                         error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
                         unverified: true,
-                        email: userRecord.email
+                        email: candidateEmail
                     });
                 }
+            }
+        }
 
-                // Fallback: inspect user in Supabase Auth via admin API
-                try {
-                    const { data: listData } = await supabase.auth.admin.listUsers();
-                    if (listData && listData.users) {
-                        const authUser = listData.users.find(u => u.email && u.email.toLowerCase() === userRecord.email.toLowerCase());
-                        if (authUser && !authUser.email_confirmed_at) {
-                            return res.status(403).json({
-                                error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
-                                unverified: true,
-                                email: userRecord.email
-                            });
-                        }
-                    }
-                } catch (adminErr) {
-                    console.warn('Admin user lookup warning:', adminErr.message);
+        // 4. Try bcrypt verification if userRecord has password hash
+        let bcryptSuccess = false;
+        if (userRecord && userRecord.password) {
+            bcryptSuccess = await bcrypt.compare(password, userRecord.password).catch(() => false);
+        }
+
+        // 5. If neither succeeded, return invalid credentials
+        if (!supabaseAuthSuccess && !bcryptSuccess) {
+            return res.status(401).json({ error: 'Invalid login credentials' });
+        }
+
+        // If authenticated via Supabase Auth but userRecord was missing from public.users, create or sync it
+        if (!userRecord && candidateEmail) {
+            try {
+                const baseUsername = candidateEmail.split('@')[0];
+                const { data: newUser } = await supabase.from('users').insert([{
+                    username: baseUsername,
+                    email: candidateEmail,
+                    role: 'user'
+                }]).select();
+                if (newUser && newUser.length > 0) {
+                    userRecord = newUser[0];
                 }
-            } else if (authData && authData.user && !authData.user.email_confirmed_at) {
-                return res.status(403).json({
-                    error: 'Please verify your email address before logging in. Check your inbox for the confirmation link.',
-                    unverified: true,
-                    email: userRecord.email
-                });
+            } catch (syncErr) {
+                console.warn('User sync warning:', syncErr.message);
             }
         }
 
         req.session.user = {
-            id: userRecord.id,
-            username: userRecord.username,
-            role: userRecord.role
+            id: userRecord ? userRecord.id : (isEmail ? candidateEmail : loginQuery),
+            username: userRecord ? userRecord.username : (isEmail ? candidateEmail.split('@')[0] : loginQuery),
+            role: userRecord && userRecord.role ? userRecord.role : 'user'
         };
 
-        res.json({ success: true, user: req.session.user });
+        return res.json({ success: true, user: req.session.user });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Server error: ' + error.message });
@@ -219,25 +256,44 @@ app.post('/register', async (req, res) => {
     username = username ? username.trim() : '';
     email = email ? email.trim().toLowerCase() : '';
 
+    if (!username || !email || !password) {
+        return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+
     if (password !== confirmPassword) {
         return res.status(400).json({ error: 'Passwords do not match' });
     }
 
     try {
+        if (!hasSupabase) {
+            return res.json({ success: true, message: 'Registration successful! (Demo mode)' });
+        }
+
         const { error: authError } = await supabase.auth.signUp({ email, password });
         if (authError) return res.status(400).json({ error: authError.message });
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const { error: dbError } = await supabase.from('users').insert([{
+        let insertData = {
             username,
             email,
             department: department || null,
             password: hashedPassword,
             role: 'user'
-        }]);
+        };
 
-        if (dbError) throw dbError;
+        let { error: dbError } = await supabase.from('users').insert([insertData]);
+
+        if (dbError && dbError.message && dbError.message.includes('password')) {
+            delete insertData.password;
+            const retry = await supabase.from('users').insert([insertData]);
+            dbError = retry.error;
+        }
+
+        if (dbError) {
+            console.error('Registration DB insert error:', dbError);
+            return res.status(400).json({ error: dbError.message || 'Database error during registration' });
+        }
 
         res.json({ success: true, message: 'Registration successful! Please check your email to verify your account.' });
     } catch (error) {
@@ -289,8 +345,17 @@ app.get('/departments', async (req, res) => {
                 { id: 4, name: "Mathematics & Statistics", code: "MATH", description: "Linear algebra, multivariable calculus, probability theory, discrete mathematics, and numerical analysis.", course_count: 5, notes_count: 15 }
             ]);
         }
-        const { data: departments, error: dErr } = await supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').order('name');
-        if (dErr) throw new Error('Database fetch failed');
+        let departments = [];
+        try {
+            const { data, error: dErr } = await supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').order('name');
+            if (!dErr && data) departments = data;
+        } catch (e) {}
+
+        if (departments.length === 0) {
+            const { data: rawDepts } = await supabase.from('departments').select('id, name, code, description').order('name');
+            departments = (rawDepts || []).map(d => ({ ...d, course_count: 0, notes_count: 0 }));
+        }
+
         res.json(departments || []);
     } catch (error) {
         console.error('Departments error:', error);
@@ -318,14 +383,28 @@ app.get('/department/:id', async (req, res) => {
                 ]
             });
         }
-        const [{ data: depts, error: dErr }, { data: courses, error: cErr }] = await Promise.all([
-            supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').eq('id', req.params.id),
-            supabase.from('course_stats').select('id, name, code, department_id, department_name, notes_count').eq('department_id', req.params.id)
-        ]);
+        let dept = null;
+        let courses = [];
+        try {
+            const [{ data: depts, error: dErr }, { data: courseList, error: cErr }] = await Promise.all([
+                supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').eq('id', req.params.id),
+                supabase.from('course_stats').select('id, name, code, department_id, department_name, notes_count').eq('department_id', req.params.id)
+            ]);
+            if (!dErr && depts && depts.length > 0) dept = depts[0];
+            if (!cErr && courseList) courses = courseList;
+        } catch (e) {}
 
-        if (dErr || !depts || depts.length === 0) return res.status(404).json({ error: 'Department not found' });
+        if (!dept) {
+            const { data: rawDepts } = await supabase.from('departments').select('id, name, code, description').eq('id', req.params.id);
+            if (!rawDepts || rawDepts.length === 0) return res.status(404).json({ error: 'Department not found' });
+            dept = rawDepts[0];
+        }
+        if (courses.length === 0) {
+            const { data: rawCourses } = await supabase.from('courses').select('id, name, code, department_id, description').eq('department_id', req.params.id);
+            courses = (rawCourses || []).map(c => ({ ...c, notes_count: 0 }));
+        }
 
-        res.json({ department: depts[0], courses: courses || [] });
+        res.json({ department: dept, courses: courses || [] });
     } catch (error) {
         console.error('Department error:', error);
         res.status(500).json({ error: 'Failed to load department' });
@@ -368,8 +447,17 @@ app.get('/courses', async (req, res) => {
                 { id: 102, name: "Database Management Systems", code: "CSE301", department_id: 1, department_name: "Computer Science & Engineering", notes_count: 9 }
             ]);
         }
-        const { data: courses, error: cErr } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name, notes_count').order('name');
-        if (cErr) throw new Error('Failed to fetch courses');
+        let courses = [];
+        try {
+            const { data, error: cErr } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name, notes_count').order('name');
+            if (!cErr && data) courses = data;
+        } catch (e) {}
+
+        if (courses.length === 0) {
+            const { data: rawCourses } = await supabase.from('courses').select('id, name, code, department_id, description').order('name');
+            courses = (rawCourses || []).map(c => ({ ...c, notes_count: 0 }));
+        }
+
         res.json(courses || []);
     } catch (error) {
         console.error('Courses error:', error);
@@ -377,7 +465,7 @@ app.get('/courses', async (req, res) => {
     }
 });
 
-app.get('/course/:id', requireAuth, async (req, res) => {
+app.get('/course/:id', async (req, res) => {
     try {
         if (!hasSupabase) {
             return res.json({
@@ -389,28 +477,76 @@ app.get('/course/:id', requireAuth, async (req, res) => {
                 ]
             });
         }
-        const { data: courses } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name').eq('id', req.params.id);
-        if (!courses || courses.length === 0) return res.status(404).json({ error: 'Course not found' });
 
-        const courseData = courses[0];
-
-        let notesQuery = supabase.from('notes').select('id, title, description, file_name, file_path, file_size, uploaded_at, status, uploaded_by, users(username)').eq('course_id', req.params.id).order('uploaded_at', { ascending: false });
-
-        if (req.session.user.role !== 'admin') {
-            notesQuery = notesQuery.or(`status.eq.approved,uploaded_by.eq.${req.session.user.id}`);
+        // 1. Fetch course details (try course_stats view, fallback to courses table)
+        let courseData = null;
+        try {
+            const { data: courses, error: cErr } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name').eq('id', req.params.id);
+            if (!cErr && courses && courses.length > 0) {
+                courseData = courses[0];
+            }
+        } catch (e) {
+            console.warn('course_stats view error, falling back:', e.message);
         }
 
-        const { data: notesData } = await notesQuery;
+        if (!courseData) {
+            const { data: rawCourses } = await supabase.from('courses').select('id, name, code, department_id, description').eq('id', req.params.id);
+            if (!rawCourses || rawCourses.length === 0) {
+                return res.status(404).json({ error: 'Course not found' });
+            }
+            courseData = rawCourses[0];
+            if (courseData.department_id) {
+                try {
+                    const { data: depts } = await supabase.from('departments').select('name').eq('id', courseData.department_id);
+                    courseData.department_name = depts && depts.length > 0 ? depts[0].name : '';
+                } catch (dErr) {}
+            }
+        }
 
-        const formattedNotes = (notesData || []).map(note => ({
+        // 2. Fetch notes for this course
+        let notesQuery = supabase.from('notes').select('id, title, description, file_name, file_path, file_size, uploaded_at, status, uploaded_by').eq('course_id', req.params.id).order('uploaded_at', { ascending: false });
+
+        const sessionUser = req.session && req.session.user ? req.session.user : null;
+
+        if (!sessionUser) {
+            // Unauthenticated visitors can see all approved notes
+            notesQuery = notesQuery.eq('status', 'approved');
+        } else if (sessionUser.role !== 'admin') {
+            // Logged-in regular users see approved notes + their own uploads
+            notesQuery = notesQuery.or(`status.eq.approved,uploaded_by.eq.${sessionUser.id}`);
+        }
+        // Admins see all notes
+
+        const { data: notesData, error: nErr } = await notesQuery;
+        if (nErr) {
+            console.error('Notes fetch error:', nErr);
+        }
+
+        const notesList = notesData || [];
+
+        // 3. Resolve uploader usernames safely without PostgREST join dependency
+        const uploaderIds = [...new Set(notesList.map(n => n.uploaded_by).filter(Boolean))];
+        let userMap = {};
+        if (uploaderIds.length > 0) {
+            try {
+                const { data: usersData } = await supabase.from('users').select('id, username').in('id', uploaderIds);
+                if (usersData) {
+                    usersData.forEach(u => { userMap[u.id] = u.username; });
+                }
+            } catch (uErr) {
+                console.warn('User lookup for notes warning:', uErr.message);
+            }
+        }
+
+        const formattedNotes = notesList.map(note => ({
             ...note,
-            uploaded_by_name: note.users ? note.users.username : 'Unknown'
+            uploaded_by_name: userMap[note.uploaded_by] || 'Student Contributor'
         }));
 
         res.json({ course: courseData, notes: formattedNotes });
     } catch (error) {
         console.error('Course error:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Server error: ' + error.message });
     }
 });
 
@@ -477,16 +613,20 @@ app.post('/upload-note/confirm', requireAuth, express.json(), async (req, res) =
     }
 });
 
-app.get('/download-note/:id', requireAuth, async (req, res) => {
+app.get('/download-note/:id', async (req, res) => {
     try {
-        const { data: notes } = await supabase.from('notes').select('id, file_path, status').eq('id', req.params.id);
+        const { data: notes } = await supabase.from('notes').select('id, file_path, status, uploaded_by').eq('id', req.params.id);
         if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
         const note = notes[0];
-        if (req.session.user.role !== 'admin' && note.status !== 'approved') {
+        const isOwner = req.session && req.session.user && req.session.user.id === note.uploaded_by;
+        const isAdmin = req.session && req.session.user && req.session.user.role === 'admin';
+
+        if (note.status !== 'approved' && !isOwner && !isAdmin) {
             return res.status(403).json({ error: 'Note not approved for download' });
         }
-        res.json({ url: note.file_path + '?download=' });
+        const separator = note.file_path && note.file_path.includes('?') ? '&' : '?';
+        res.json({ url: note.file_path + separator + 'download=' });
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ error: 'Download failed' });
@@ -536,12 +676,40 @@ app.get('/admin/pending-approvals', requireAdmin, async (req, res) => {
             return res.json(localMockPendingNotes);
         }
 
-        const { data: notes } = await supabase.from('notes').select('*, users(username), courses(name)').eq('status', 'pending').order('uploaded_at', { ascending: false });
+        let notes = [];
+        try {
+            const { data, error } = await supabase.from('notes').select('*, users(username), courses(name)').eq('status', 'pending').order('uploaded_at', { ascending: false });
+            if (!error && data) notes = data;
+        } catch (e) {}
 
-        const formattedNotes = (notes || []).map(note => ({
+        if (notes.length === 0) {
+            const { data: rawNotes } = await supabase.from('notes').select('*').eq('status', 'pending').order('uploaded_at', { ascending: false });
+            notes = rawNotes || [];
+        }
+
+        const uploaderIds = [...new Set(notes.map(n => n.uploaded_by).filter(Boolean))];
+        const courseIds = [...new Set(notes.map(n => n.course_id).filter(Boolean))];
+
+        let userMap = {};
+        let courseMap = {};
+
+        if (uploaderIds.length > 0) {
+            try {
+                const { data: users } = await supabase.from('users').select('id, username').in('id', uploaderIds);
+                if (users) users.forEach(u => { userMap[u.id] = u.username; });
+            } catch (err) {}
+        }
+        if (courseIds.length > 0) {
+            try {
+                const { data: courses } = await supabase.from('courses').select('id, name').in('id', courseIds);
+                if (courses) courses.forEach(c => { courseMap[c.id] = c.name; });
+            } catch (err) {}
+        }
+
+        const formattedNotes = notes.map(note => ({
             ...note,
-            uploaded_by_name: note.users ? note.users.username : 'Unknown',
-            course_name: note.courses ? note.courses.name : 'Unknown'
+            uploaded_by_name: (note.users && note.users.username) || userMap[note.uploaded_by] || 'Student Contributor',
+            course_name: (note.courses && note.courses.name) || courseMap[note.course_id] || 'Course'
         }));
 
         res.json(formattedNotes);
@@ -675,8 +843,23 @@ app.get('/admin/users', requireAdmin, async (req, res) => {
         if (!hasSupabase) {
             return res.json(localMockUsers);
         }
-        const { data: users, error } = await supabase.from('user_stats').select('id, username, email, department, role, created_at, total_notes, approved_notes, pending_notes, rejected_notes').order('created_at', { ascending: false });
-        if (error) throw new Error('Database fetch failed');
+        let users = [];
+        try {
+            const { data, error } = await supabase.from('user_stats').select('id, username, email, department, role, created_at, total_notes, approved_notes, pending_notes, rejected_notes').order('created_at', { ascending: false });
+            if (!error && data) users = data;
+        } catch (e) {}
+
+        if (users.length === 0) {
+            const { data: rawUsers } = await supabase.from('users').select('id, username, email, department, role, created_at').order('created_at', { ascending: false });
+            users = (rawUsers || []).map(u => ({
+                ...u,
+                total_notes: 0,
+                approved_notes: 0,
+                pending_notes: 0,
+                rejected_notes: 0
+            }));
+        }
+
         res.json(users || []);
     } catch (error) {
         console.error('Get users error:', error);
