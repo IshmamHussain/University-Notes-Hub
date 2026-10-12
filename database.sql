@@ -2,10 +2,14 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255),
     department VARCHAR(100),
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure password column exists if table was already created
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255);
 
 CREATE TABLE IF NOT EXISTS departments (
     id SERIAL PRIMARY KEY,
