@@ -12,7 +12,7 @@ if (!hasSupabase) {
     console.warn("⚠️ Missing SUPABASE env vars. Server operating with local fallback mode.");
 }
 const supabase = createClient(
-    process.env.SUPABASE_URL || "https://dummy-local-project.supabase.co", 
+    process.env.SUPABASE_URL || "https://dummy-local-project.supabase.co",
     process.env.SUPABASE_SERVICE_KEY || "dummy-service-key-for-local-demo"
 );
 
@@ -108,7 +108,7 @@ app.post('/login', async (req, res) => {
     if (!loginQuery || !password) {
         return res.status(400).json({ error: 'Username/Email and password are required' });
     }
-    
+
     // Trim spaces and handle case sensitivity for emails
     loginQuery = loginQuery.trim();
     if (loginQuery.includes('@')) {
@@ -129,7 +129,7 @@ app.post('/login', async (req, res) => {
         if (loginQuery === 'admin') {
             const adminHash = process.env.ADMIN_PASSWORD_HASH || '$2a$10$DqF7Espfm1XTrp9J/ehY/OSSsB4F2/3cYPYerx2SfTeHUbRquHnHG';
             const isValid = await bcrypt.compare(password, adminHash);
-            
+
             if (isValid) {
                 const { data: users } = await supabase.from('users').select('id, username, role').eq('username', 'admin');
                 if (users && users.length > 0) {
@@ -153,13 +153,11 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid login credentials' });
         }
 
-        // Validate password using bcrypt
         const isMatch = await bcrypt.compare(password, userRecord.password);
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid login credentials' });
         }
 
-        // Ensure email is verified in Supabase Auth before allowing login
         if (hasSupabase && userRecord.email && userRecord.role !== 'admin') {
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                 email: userRecord.email,
@@ -320,13 +318,13 @@ app.get('/department/:id', async (req, res) => {
                 ]
             });
         }
-        const [ { data: depts, error: dErr }, { data: courses, error: cErr } ] = await Promise.all([
+        const [{ data: depts, error: dErr }, { data: courses, error: cErr }] = await Promise.all([
             supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').eq('id', req.params.id),
             supabase.from('course_stats').select('id, name, code, department_id, department_name, notes_count').eq('department_id', req.params.id)
         ]);
 
         if (dErr || !depts || depts.length === 0) return res.status(404).json({ error: 'Department not found' });
-        
+
         res.json({ department: depts[0], courses: courses || [] });
     } catch (error) {
         console.error('Department error:', error);
@@ -423,7 +421,7 @@ app.post('/upload-note/sign', requireAuth, express.json(), async (req, res) => {
     try {
         const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.ppt', '.pptx'];
         const fileExt = path.extname(fileName).toLowerCase();
-        
+
         if (!allowedTypes.includes(fileExt)) {
             return res.status(400).json({ error: 'Only document files are allowed! Invalid extension.' });
         }
@@ -453,7 +451,7 @@ app.post('/upload-note/sign', requireAuth, express.json(), async (req, res) => {
 
 app.post('/upload-note/confirm', requireAuth, express.json(), async (req, res) => {
     const { title, description, course_id, file_name, file_path, file_size } = req.body;
-    
+
     if (!title || !course_id || !file_name || !file_path) {
         return res.status(400).json({ error: 'Missing required note metadata' });
     }
@@ -462,16 +460,16 @@ app.post('/upload-note/confirm', requireAuth, express.json(), async (req, res) =
         const status = req.session.user.role === 'admin' ? 'approved' : 'pending';
 
         const { error: dbError } = await supabase.from('notes').insert([{
-            title, description, file_name, file_path, file_size, course_id, 
+            title, description, file_name, file_path, file_size, course_id,
             uploaded_by: req.session.user.id, status
         }]);
 
         if (dbError) throw dbError;
 
-        const message = status === 'approved' 
-            ? 'Note uploaded successfully!' 
+        const message = status === 'approved'
+            ? 'Note uploaded successfully!'
             : 'Note uploaded successfully! It will be available after admin approval.';
-            
+
         res.json({ success: true, message, status });
     } catch (error) {
         console.error('Upload confirm error:', error);
@@ -518,8 +516,26 @@ app.delete('/note/:id', requireAuth, async (req, res) => {
     }
 });
 
+// Local mock data store for admin panel operations when running without Supabase credentials
+let localMockUsers = [
+    { id: 1, username: 'admin', email: 'admin@university.edu', student_id: 'ADM-001', department: 'Computer Science', batch: 1, role: 'admin', created_at: '2024-01-15T08:00:00Z', total_notes: 15, approved_notes: 15, pending_notes: 0, rejected_notes: 0 },
+    { id: 2, username: 'sarah_khan', email: 'sarah.khan@university.edu', student_id: 'CSE-21-042', department: 'Computer Science', batch: 58, role: 'user', created_at: '2024-02-10T10:30:00Z', total_notes: 12, approved_notes: 11, pending_notes: 1, rejected_notes: 0 },
+    { id: 3, username: 'tanvir_ahmed', email: 'tanvir.eee@university.edu', student_id: 'EEE-21-089', department: 'Electrical Engineering', batch: 58, role: 'user', created_at: '2024-02-18T14:15:00Z', total_notes: 8, approved_notes: 7, pending_notes: 1, rejected_notes: 0 },
+    { id: 4, username: 'anika_rahman', email: 'anika.bba@university.edu', student_id: 'BBA-22-105', department: 'Business Administration', batch: 59, role: 'user', created_at: '2024-03-01T09:45:00Z', total_notes: 6, approved_notes: 6, pending_notes: 0, rejected_notes: 0 },
+    { id: 5, username: 'farhan_kabir', email: 'farhan.math@university.edu', student_id: 'MAT-22-019', department: 'Mathematics', batch: 59, role: 'user', created_at: '2024-03-12T16:20:00Z', total_notes: 4, approved_notes: 4, pending_notes: 0, rejected_notes: 0 }
+];
+
+let localMockPendingNotes = [
+    { id: 101, title: 'Neural Networks Lab Manual', description: 'Complete practical code examples for PyTorch', file_name: 'DL_Lab_Guide.pdf', file_size: 2450000, uploaded_at: new Date().toISOString(), uploaded_by_name: 'sarah_khan', course_name: 'Deep Learning', department_name: 'CSE' },
+    { id: 102, title: 'Microprocessor 8086 Instruction Set Sheet', description: 'Comprehensive register reference and timing diagrams', file_name: '8086_Sheet.pdf', file_size: 1200000, uploaded_at: new Date().toISOString(), uploaded_by_name: 'tanvir_ahmed', course_name: 'Microprocessors', department_name: 'EEE' }
+];
+
 app.get('/admin/pending-approvals', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json(localMockPendingNotes);
+        }
+
         const { data: notes } = await supabase.from('notes').select('*, users(username), courses(name)').eq('status', 'pending').order('uploaded_at', { ascending: false });
 
         const formattedNotes = (notes || []).map(note => ({
@@ -537,6 +553,10 @@ app.get('/admin/pending-approvals', requireAdmin, async (req, res) => {
 
 app.post('/admin/approve-note/:id', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            localMockPendingNotes = localMockPendingNotes.filter(n => String(n.id) !== String(req.params.id));
+            return res.json({ success: true, message: 'Note approved successfully' });
+        }
         await supabase.from('notes').update({ status: 'approved' }).eq('id', req.params.id);
         res.json({ success: true, message: 'Note approved successfully' });
     } catch (error) {
@@ -546,6 +566,10 @@ app.post('/admin/approve-note/:id', requireAdmin, async (req, res) => {
 
 app.post('/admin/reject-note/:id', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            localMockPendingNotes = localMockPendingNotes.filter(n => String(n.id) !== String(req.params.id));
+            return res.json({ success: true, message: 'Note rejected successfully' });
+        }
         await supabase.from('notes').update({ status: 'rejected' }).eq('id', req.params.id);
         res.json({ success: true, message: 'Note rejected successfully' });
     } catch (error) {
@@ -555,6 +579,18 @@ app.post('/admin/reject-note/:id', requireAdmin, async (req, res) => {
 
 app.get('/admin/stats', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json({
+                users: localMockUsers.length,
+                departments: 4,
+                courses: 26,
+                notes: 90,
+                pending_approvals: localMockPendingNotes.length,
+                rejected_notes: 1,
+                total_notes: 90 + localMockPendingNotes.length + 1
+            });
+        }
+
         const [
             { count: uCount }, { count: dCount }, { count: cCount },
             { count: nAppr }, { count: nPend }, { count: nRej }, { count: nTotal }
@@ -581,6 +617,9 @@ app.get('/admin/stats', requireAdmin, async (req, res) => {
 app.post('/admin/departments', requireAdmin, async (req, res) => {
     const { name, code, description } = req.body;
     try {
+        if (!hasSupabase) {
+            return res.json({ success: true, message: 'Department added successfully' });
+        }
         await supabase.from('departments').insert([{ name, code, description, created_by: req.session.user.id }]);
         res.json({ success: true, message: 'Department added successfully' });
     } catch (error) {
@@ -591,6 +630,9 @@ app.post('/admin/departments', requireAdmin, async (req, res) => {
 app.post('/admin/courses', requireAdmin, async (req, res) => {
     const { name, code, department_id, description } = req.body;
     try {
+        if (!hasSupabase) {
+            return res.json({ success: true, message: 'Course added successfully' });
+        }
         await supabase.from('courses').insert([{ name, code, department_id, description, created_by: req.session.user.id }]);
         res.json({ success: true, message: 'Course added successfully' });
     } catch (error) {
@@ -600,6 +642,9 @@ app.post('/admin/courses', requireAdmin, async (req, res) => {
 
 app.delete('/admin/departments/:id', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json({ success: true, message: 'Department deleted successfully' });
+        }
         const { count } = await supabase.from('courses').select('id', { count: 'exact', head: true }).eq('department_id', req.params.id);
         if (count > 0) return res.status(400).json({ error: 'Cannot delete department with existing courses.' });
 
@@ -612,6 +657,9 @@ app.delete('/admin/departments/:id', requireAdmin, async (req, res) => {
 
 app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json({ success: true, message: 'Course deleted successfully' });
+        }
         const { count } = await supabase.from('notes').select('id', { count: 'exact', head: true }).eq('course_id', req.params.id);
         if (count > 0) return res.status(400).json({ error: 'Cannot delete course with existing notes.' });
 
@@ -624,6 +672,9 @@ app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
 
 app.get('/admin/users', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json(localMockUsers);
+        }
         const { data: users, error } = await supabase.from('user_stats').select('id, username, email, department, role, created_at, total_notes, approved_notes, pending_notes, rejected_notes').order('created_at', { ascending: false });
         if (error) throw new Error('Database fetch failed');
         res.json(users || []);
@@ -638,6 +689,18 @@ app.put('/admin/users/:id', requireAdmin, async (req, res) => {
     username = username ? username.trim() : null;
     email = email ? email.trim().toLowerCase() : null;
     try {
+        if (!hasSupabase) {
+            const user = localMockUsers.find(u => String(u.id) === String(req.params.id));
+            if (user) {
+                if (username) user.username = username;
+                if (email) user.email = email;
+                if (student_id !== undefined) user.student_id = student_id;
+                if (department !== undefined) user.department = department;
+                if (batch !== undefined) user.batch = batch;
+                if (role) user.role = role;
+            }
+            return res.json({ success: true, message: 'User updated successfully' });
+        }
         await supabase.from('users').update({ username, email, student_id, department, batch, role }).eq('id', req.params.id);
         res.json({ success: true, message: 'User updated successfully' });
     } catch (error) {
@@ -647,6 +710,10 @@ app.put('/admin/users/:id', requireAdmin, async (req, res) => {
 
 app.delete('/admin/users/:id', requireAdmin, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            localMockUsers = localMockUsers.filter(u => String(u.id) !== String(req.params.id));
+            return res.json({ success: true, message: 'User deleted successfully' });
+        }
         await supabase.from('users').delete().eq('id', req.params.id);
         res.json({ success: true, message: 'User deleted successfully' });
     } catch (error) {
@@ -734,7 +801,7 @@ const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
-        console.log('📚 University Notes Hub is ready locally (Supabase connected)!');
+        console.log('📚 University Notes Hub is ready locally!');
     });
 }
 

@@ -1,0 +1,21 @@
+{
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-10-12T07:09:47.580Z",
+        "reason": "Approved brand font"
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-10-12T07:09:52.296Z",
+        "reason": "Approved brand heading font"
+      }
+    ]
+  }
+}
