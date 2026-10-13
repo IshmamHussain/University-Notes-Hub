@@ -465,16 +465,56 @@ app.get('/courses', async (req, res) => {
     }
 });
 
+app.get('/api/status', (req, res) => {
+    res.json({
+        supabaseConnected: hasSupabase,
+        mode: hasSupabase ? 'live_supabase' : 'local_mock',
+        sessionActive: !!(req.session && req.session.user),
+        user: req.session && req.session.user ? req.session.user.username : null
+    });
+});
+
 app.get('/course/:id', async (req, res) => {
     try {
         if (!hasSupabase) {
+            const mockCourses = {
+                '101': {
+                    name: "Data Structures & Algorithms", code: "CSE201", department_name: "Computer Science & Engineering",
+                    description: "Comprehensive notes covering binary search trees, heap algorithms, graph traversals, and dynamic programming.",
+                    notes: [
+                        { id: 1, title: "Graph Algorithms & BFS/DFS Cheatsheet", description: "In-depth visual summary of graph representations, Dijkstra, topological sort, and cycle detection.", file_name: "graph_algorithms.pdf", file_size: 2450000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 1, uploaded_by_name: "Alex_Chen" },
+                        { id: 2, title: "Dynamic Programming Classic Problems", description: "Memoization vs tabulation, knapsack, LCS, matrix chain multiplication with clean pseudocode.", file_name: "dp_handbook.docx", file_size: 1850000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 2, uploaded_by_name: "Sarah_Dev" },
+                        { id: 3, title: "Balanced Search Trees & AVL Rotations", description: "Self-balancing AVL tree insertion, deletion, and rotation step-by-step diagrams.", file_name: "avl_trees.pdf", file_size: 3100000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 3, uploaded_by_name: "David_K" }
+                    ]
+                },
+                '102': {
+                    name: "Database Management Systems", code: "CSE301", department_name: "Computer Science & Engineering",
+                    description: "Relational models, SQL, indexing, transaction processing, and normalization.",
+                    notes: [
+                        { id: 4, title: "SQL Indexing & Normalization Guide", description: "B-Tree indexes, composite keys, 1NF to BCNF with step-by-step schema examples.", file_name: "sql_indexing.pdf", file_size: 1950000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 1, uploaded_by_name: "Alex_Chen" },
+                        { id: 5, title: "Relational Algebra & Query Trees", description: "Relational operators, projection, selection, and query cost trees.", file_name: "relational_algebra.pdf", file_size: 1420000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 2, uploaded_by_name: "Sarah_Dev" }
+                    ]
+                },
+                '103': {
+                    name: "Operating Systems", code: "CSE303", department_name: "Computer Science & Engineering",
+                    description: "Processes, threads, synchronization, CPU scheduling, and virtual memory.",
+                    notes: [
+                        { id: 6, title: "Process Scheduling & Semaphores Cheatsheet", description: "Round Robin, Priority scheduling, Semaphores, Mutexes, and Producer-Consumer problem.", file_name: "process_scheduling.pdf", file_size: 2150000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 3, uploaded_by_name: "David_K" }
+                    ]
+                },
+                '104': {
+                    name: "Computer Networks", code: "CSE305", department_name: "Computer Science & Engineering",
+                    description: "OSI model, TCP/IP, routing algorithms, socket programming, and network security.",
+                    notes: [
+                        { id: 7, title: "TCP/IP Protocol Suite & Handshake Summary", description: "Three-way handshake, flow control, sliding window, and subnetting formulas.", file_name: "tcp_ip_summary.pdf", file_size: 1780000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 1, uploaded_by_name: "Alex_Chen" }
+                    ]
+                }
+            };
+            const cId = String(req.params.id);
+            const courseInfo = mockCourses[cId] || mockCourses['101'];
             return res.json({
-                course: { id: req.params.id, name: "Data Structures & Algorithms", code: "CSE201", department_name: "Computer Science & Engineering", description: "Comprehensive notes covering binary search trees, heap algorithms, graph traversals, and dynamic programming." },
-                notes: [
-                    { id: 1, title: "Graph Algorithms & BFS/DFS Cheatsheet", description: "In-depth visual summary of graph representations, Dijkstra, topological sort, and cycle detection.", file_name: "graph_algorithms.pdf", file_size: 2450000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 1, uploaded_by_name: "Alex_Chen" },
-                    { id: 2, title: "Dynamic Programming Classic Problems", description: "Memoization vs tabulation, knapsack, LCS, matrix chain multiplication with clean pseudocode.", file_name: "dp_handbook.docx", file_size: 1850000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 2, uploaded_by_name: "Sarah_Dev" },
-                    { id: 3, title: "Balanced Search Trees & AVL Rotations", description: "Self-balancing AVL tree insertion, deletion, and rotation step-by-step diagrams.", file_name: "avl_trees.pdf", file_size: 3100000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 3, uploaded_by_name: "David_K" }
-                ]
+                course: { id: req.params.id, name: courseInfo.name, code: courseInfo.code, department_name: courseInfo.department_name, description: courseInfo.description },
+                notes: courseInfo.notes
             });
         }
 
@@ -503,8 +543,10 @@ app.get('/course/:id', async (req, res) => {
             }
         }
 
-        // 2. Fetch notes for this course
-        let notesQuery = supabase.from('notes').select('id, title, description, file_name, file_path, file_size, uploaded_at, status, uploaded_by').eq('course_id', req.params.id).order('uploaded_at', { ascending: false });
+        // 2. Fetch notes for this course (robust against string or integer ID)
+        const courseIdNum = parseInt(req.params.id, 10);
+        const courseFilter = !isNaN(courseIdNum) ? courseIdNum : req.params.id;
+        let notesQuery = supabase.from('notes').select('id, title, description, file_name, file_path, file_size, uploaded_at, status, uploaded_by').eq('course_id', courseFilter).order('uploaded_at', { ascending: false });
 
         const sessionUser = req.session && req.session.user ? req.session.user : null;
 

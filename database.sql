@@ -79,3 +79,37 @@ SELECT
 FROM users u
 LEFT JOIN notes n ON u.id = n.uploaded_by
 GROUP BY u.id;
+
+-- ========================================================
+-- SEED DATA: Departments, Courses, and Sample Approved Notes
+-- ========================================================
+
+INSERT INTO departments (id, name, code, description) VALUES
+(1, 'Computer Science & Engineering', 'CSE', 'Algorithms, artificial intelligence, software architecture, operating systems, and computer vision.'),
+(2, 'Electrical & Electronic Engineering', 'EEE', 'Circuit theory, telecommunications, robotics, signals and systems, and microelectronics.'),
+(3, 'Business Administration', 'BBA', 'Corporate finance, managerial economics, marketing strategy, and organizational behavior.'),
+(4, 'Mathematics & Statistics', 'MATH', 'Linear algebra, multivariable calculus, probability theory, discrete mathematics, and numerical analysis.')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO courses (id, name, code, department_id, description) VALUES
+(101, 'Data Structures & Algorithms', 'CSE201', 1, 'Stacks, queues, trees, graphs, sorting, searching, and dynamic programming.'),
+(102, 'Database Management Systems', 'CSE301', 1, 'Relational models, SQL, indexing, transaction processing, and normalization.'),
+(103, 'Operating Systems', 'CSE303', 1, 'Processes, threads, synchronization, CPU scheduling, and virtual memory.'),
+(104, 'Computer Networks', 'CSE305', 1, 'OSI model, TCP/IP, routing algorithms, socket programming, and network security.')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO notes (id, title, description, file_name, file_path, file_size, course_id, uploaded_by, status) VALUES
+(1, 'Graph Algorithms & BFS/DFS Cheatsheet', 'In-depth visual summary of graph representations, Dijkstra, topological sort, and cycle detection.', 'graph_algorithms.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 2450000, 101, 1, 'approved'),
+(2, 'Dynamic Programming Classic Problems', 'Memoization vs tabulation, knapsack, LCS, matrix chain multiplication with clean pseudocode.', 'dp_handbook.docx', 'https://university-notes-hub.vercel.app/favicon.svg', 1850000, 101, 1, 'approved'),
+(3, 'Balanced Search Trees & AVL Rotations', 'Self-balancing AVL tree insertion, deletion, and rotation step-by-step diagrams.', 'avl_trees.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 3100000, 101, 1, 'approved'),
+(4, 'SQL Indexing & Normalization Guide', 'B-Tree indexes, composite keys, 1NF to BCNF with step-by-step schema examples.', 'sql_indexing.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 1950000, 102, 1, 'approved'),
+(5, 'Relational Algebra & Query Trees', 'Relational operators, projection, selection, and query cost trees.', 'relational_algebra.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 1420000, 102, 1, 'approved'),
+(6, 'Process Scheduling & Semaphores Cheatsheet', 'Round Robin, Priority scheduling, Semaphores, Mutexes, and Producer-Consumer problem.', 'process_scheduling.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 2150000, 103, 1, 'approved'),
+(7, 'TCP/IP Protocol Suite & Handshake Summary', 'Three-way handshake, flow control, sliding window, and subnetting formulas.', 'tcp_ip_summary.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 1780000, 104, 1, 'approved')
+ON CONFLICT (id) DO NOTHING;
+
+-- Reset primary key auto-increment sequences
+SELECT setval(pg_get_serial_sequence('departments', 'id'), COALESCE(MAX(id), 1)) FROM departments;
+SELECT setval(pg_get_serial_sequence('courses', 'id'), COALESCE(MAX(id), 1)) FROM courses;
+SELECT setval(pg_get_serial_sequence('notes', 'id'), COALESCE(MAX(id), 1)) FROM notes;
+
