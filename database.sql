@@ -146,8 +146,8 @@ DO $$ BEGIN
     END IF;
 END $$;
 
--- Promote Ishmam Hussain account to Admin
-UPDATE users SET role = 'admin' WHERE email = 'ishmamhussain003@gmail.com' OR username = 'Ishmam Hussain';
+-- Optional: Promote an admin account (replace with your admin email or username)
+-- UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
 
 
 

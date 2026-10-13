@@ -300,9 +300,10 @@ app.post('/login', async (req, res) => {
         }
 
         let userRole = userRecord && userRecord.role ? userRecord.role : 'user';
-        const adminIdentities = (process.env.ADMIN_IDENTIFIERS || 'ishmamhussain003@gmail.com,Ishmam Hussain')
+        const adminIdentities = (process.env.ADMIN_IDENTIFIERS || '')
             .split(',')
-            .map(s => s.trim().toLowerCase());
+            .map(s => s.trim().toLowerCase())
+            .filter(Boolean);
         const userIdentifier = (userRecord && userRecord.email ? userRecord.email : (isEmail ? candidateEmail : loginQuery)).toLowerCase();
         const userNameIdentifier = (userRecord && userRecord.username ? userRecord.username : loginQuery).toLowerCase();
         if (adminIdentities.includes(userIdentifier) || adminIdentities.includes(userNameIdentifier)) {
