@@ -518,19 +518,32 @@ app.get('/course/:id', async (req, res) => {
             });
         }
 
-        // 1. Fetch course details (try course_stats view, fallback to courses table)
-        let courseData = null;
-        try {
-            const { data: courses, error: cErr } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name').eq('id', req.params.id);
-            if (!cErr && courses && courses.length > 0) {
-                courseData = courses[0];
-            }
-        } catch (e) {
-            console.warn('course_stats view error, falling back:', e.message);
+        // 1. Fetch course details and notes in parallel using Promise.all
+        const courseIdNum = parseInt(req.params.id, 10);
+        const courseFilter = !isNaN(courseIdNum) ? courseIdNum : req.params.id;
+        const sessionUser = req.session && req.session.user ? req.session.user : null;
+
+        let notesQuery = supabase
+            .from('notes')
+            .select('id, title, description, file_name, file_path, file_size, uploaded_at, status, uploaded_by')
+            .eq('course_id', courseFilter)
+            .order('uploaded_at', { ascending: false });
+
+        if (!sessionUser) {
+            notesQuery = notesQuery.or('status.eq.approved,status.ilike.approved');
+        } else if (sessionUser.role !== 'admin') {
+            notesQuery = notesQuery.or(`status.eq.approved,status.ilike.approved,uploaded_by.eq.${sessionUser.id}`);
         }
 
+        const [courseStatsRes, notesRes] = await Promise.all([
+            supabase.from('course_stats').select('id, name, code, department_id, description, department_name').eq('id', courseFilter),
+            notesQuery
+        ]);
+
+        let courseData = (courseStatsRes.data && courseStatsRes.data.length > 0) ? courseStatsRes.data[0] : null;
+
         if (!courseData) {
-            const { data: rawCourses } = await supabase.from('courses').select('id, name, code, department_id, description').eq('id', req.params.id);
+            const { data: rawCourses } = await supabase.from('courses').select('id, name, code, department_id, description').eq('id', courseFilter);
             if (!rawCourses || rawCourses.length === 0) {
                 return res.status(404).json({ error: 'Course not found' });
             }
@@ -543,30 +556,25 @@ app.get('/course/:id', async (req, res) => {
             }
         }
 
-        // 2. Fetch notes for this course (robust against string or integer ID)
-        const courseIdNum = parseInt(req.params.id, 10);
-        const courseFilter = !isNaN(courseIdNum) ? courseIdNum : req.params.id;
-        let notesQuery = supabase.from('notes').select('id, title, description, file_name, file_path, file_size, uploaded_at, status, uploaded_by').eq('course_id', courseFilter).order('uploaded_at', { ascending: false });
-
-        const sessionUser = req.session && req.session.user ? req.session.user : null;
-
-        if (!sessionUser) {
-            // Unauthenticated visitors can see all approved notes
-            notesQuery = notesQuery.eq('status', 'approved');
-        } else if (sessionUser.role !== 'admin') {
-            // Logged-in regular users see approved notes + their own uploads
-            notesQuery = notesQuery.or(`status.eq.approved,uploaded_by.eq.${sessionUser.id}`);
-        }
-        // Admins see all notes
-
-        const { data: notesData, error: nErr } = await notesQuery;
-        if (nErr) {
-            console.error('Notes fetch error:', nErr);
+        let notesList = notesRes.data || [];
+        if (notesRes.error) {
+            console.warn('Primary notes query error, attempting fallback:', notesRes.error.message);
+            try {
+                const fallbackQuery = await supabase.from('notes').select('*').eq('course_id', courseFilter);
+                if (fallbackQuery.data) {
+                    notesList = fallbackQuery.data.filter(n => {
+                        const st = (n.status || '').toLowerCase();
+                        if (!sessionUser) return st === 'approved';
+                        if (sessionUser.role === 'admin') return true;
+                        return st === 'approved' || String(n.uploaded_by) === String(sessionUser.id);
+                    });
+                }
+            } catch (fbErr) {
+                console.error('Notes fallback failed:', fbErr.message);
+            }
         }
 
-        const notesList = notesData || [];
-
-        // 3. Resolve uploader usernames safely without PostgREST join dependency
+        // 2. Resolve uploader usernames safely without PostgREST join dependency
         const uploaderIds = [...new Set(notesList.map(n => n.uploaded_by).filter(Boolean))];
         let userMap = {};
         if (uploaderIds.length > 0) {
@@ -657,6 +665,9 @@ app.post('/upload-note/confirm', requireAuth, express.json(), async (req, res) =
 
 app.get('/download-note/:id', async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json({ url: '/favicon.svg' });
+        }
         const { data: notes } = await supabase.from('notes').select('id, file_path, status, uploaded_by').eq('id', req.params.id);
         if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
@@ -672,6 +683,32 @@ app.get('/download-note/:id', async (req, res) => {
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ error: 'Download failed' });
+    }
+});
+
+app.get('/preview-note/:id', async (req, res) => {
+    try {
+        if (!hasSupabase) {
+            return res.redirect('/favicon.svg');
+        }
+        const { data: notes } = await supabase.from('notes').select('id, file_path, status, uploaded_by').eq('id', req.params.id);
+        if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
+
+        const note = notes[0];
+        const isOwner = req.session && req.session.user && req.session.user.id === note.uploaded_by;
+        const isAdmin = req.session && req.session.user && req.session.user.role === 'admin';
+
+        if (note.status !== 'approved' && !isOwner && !isAdmin) {
+            return res.status(403).json({ error: 'Note not approved for preview' });
+        }
+
+        if (req.headers.accept && req.headers.accept.includes('application/json')) {
+            return res.json({ url: note.file_path });
+        }
+        res.redirect(note.file_path);
+    } catch (error) {
+        console.error('Preview error:', error);
+        res.status(500).json({ error: 'Preview failed' });
     }
 });
 

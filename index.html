@@ -3609,6 +3609,10 @@
                                 </div>
                             </div>
                             <div class="note-actions">
+                                <button class="btn btn-secondary btn-small" onclick="previewNote(${note.id})" 
+                                    ${!canDownload ? 'disabled' : ''} title="Preview note in new tab">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
                                 <button class="btn btn-primary btn-small" onclick="downloadNote(${note.id})" 
                                     ${!canDownload ? 'disabled' : ''}>
                                     <i class="fas fa-download"></i> Download
@@ -4446,7 +4450,7 @@
         }
 
         async function previewNote(noteId) {
-            window.open(`${API_BASE}/download-note/${noteId}`, '_blank');
+            window.open(`${API_BASE}/preview-note/${noteId}`, '_blank');
         }
 
         document.getElementById('addDepartmentForm').addEventListener('submit', async function (e) {
