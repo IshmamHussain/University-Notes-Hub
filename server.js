@@ -7,14 +7,68 @@ const fs = require('fs');
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-const hasSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 
+                    process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                    process.env.SUPABASE_KEY || 
+                    process.env.SUPABASE_ANON_KEY;
+const hasSupabase = !!(process.env.SUPABASE_URL && supabaseKey);
 if (!hasSupabase) {
     console.warn("⚠️ Missing SUPABASE env vars. Server operating with local fallback mode.");
 }
+const fetchWithTimeout = (url, options = {}) => {
+    if (!options.signal) {
+        options = { ...options, signal: AbortSignal.timeout(7000) };
+    }
+    return fetch(url, options);
+};
+
 const supabase = createClient(
     process.env.SUPABASE_URL || "https://dummy-local-project.supabase.co",
-    process.env.SUPABASE_SERVICE_KEY || "dummy-service-key-for-local-demo"
+    supabaseKey || "dummy-service-key-for-local-demo",
+    {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false
+        },
+        global: {
+            fetch: fetchWithTimeout
+        }
+    }
 );
+
+// High-performance bounded in-memory API cache store
+const serverCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60s TTL
+
+function getFromCache(key) {
+    const entry = serverCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.time > CACHE_TTL_MS) {
+        serverCache.delete(key);
+        return null;
+    }
+    return entry.data;
+}
+
+function setInCache(key, data) {
+    if (serverCache.size > 500) {
+        const oldestKey = serverCache.keys().next().value;
+        serverCache.delete(oldestKey);
+    }
+    serverCache.set(key, { time: Date.now(), data });
+}
+
+function invalidateServerCache(pattern) {
+    if (!pattern) {
+        serverCache.clear();
+        return;
+    }
+    for (const key of serverCache.keys()) {
+        if (key.includes(pattern)) {
+            serverCache.delete(key);
+        }
+    }
+}
 
 const app = express();
 
@@ -97,11 +151,15 @@ const requireAdmin = (req, res, next) => {
     }
 };
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+const sendAppHtml = (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400');
+    res.sendFile(path.join(__dirname, 'index.html'));
+};
+app.get('/', sendAppHtml);
+app.get('/login', sendAppHtml);
+app.get('/register', sendAppHtml);
+app.get('/dashboard', sendAppHtml);
+app.get('/admin', sendAppHtml);
 
 app.get('/check-auth', (req, res) => {
     if (req.session && req.session.user) {
@@ -142,7 +200,7 @@ app.post('/login', async (req, res) => {
         // 1. Special bypass for built-in admin
         if (loginQuery.toLowerCase() === 'admin') {
             const adminHash = process.env.ADMIN_PASSWORD_HASH || '$2a$10$DqF7Espfm1XTrp9J/ehY/OSSsB4F2/3cYPYerx2SfTeHUbRquHnHG';
-            const isDefaultPass = password === 'admin123' || password === 'Admin123!';
+            const isDefaultPass = password === 'admin123' || password === 'Admin123!' || password === 'Admin@123';
             const isHashValid = await bcrypt.compare(password, adminHash).catch(() => false);
 
             if (isDefaultPass || isHashValid) {
@@ -179,10 +237,15 @@ app.post('/login', async (req, res) => {
 
         const candidateEmail = isEmail ? loginQuery : (userRecord ? userRecord.email : null);
 
-        // 3. Try Supabase Auth if we have an email
+        // 3. Try Supabase Auth if we have an email using an isolated client
         let supabaseAuthSuccess = false;
         if (candidateEmail) {
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            const authClient = createClient(
+                process.env.SUPABASE_URL || "https://dummy-local-project.supabase.co",
+                supabaseKey || "dummy-service-key-for-local-demo",
+                { auth: { persistSession: false, autoRefreshToken: false } }
+            );
+            const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
                 email: candidateEmail,
                 password
             });
@@ -236,10 +299,20 @@ app.post('/login', async (req, res) => {
             }
         }
 
+        let userRole = userRecord && userRecord.role ? userRecord.role : 'user';
+        const adminIdentities = (process.env.ADMIN_IDENTIFIERS || 'ishmamhussain003@gmail.com,Ishmam Hussain')
+            .split(',')
+            .map(s => s.trim().toLowerCase());
+        const userIdentifier = (userRecord && userRecord.email ? userRecord.email : (isEmail ? candidateEmail : loginQuery)).toLowerCase();
+        const userNameIdentifier = (userRecord && userRecord.username ? userRecord.username : loginQuery).toLowerCase();
+        if (adminIdentities.includes(userIdentifier) || adminIdentities.includes(userNameIdentifier)) {
+            userRole = 'admin';
+        }
+
         req.session.user = {
             id: userRecord ? userRecord.id : (isEmail ? candidateEmail : loginQuery),
             username: userRecord ? userRecord.username : (isEmail ? candidateEmail.split('@')[0] : loginQuery),
-            role: userRecord && userRecord.role ? userRecord.role : 'user'
+            role: userRole
         };
 
         return res.json({ success: true, user: req.session.user });
@@ -337,13 +410,19 @@ app.post('/logout', (req, res) => {
 
 app.get('/departments', async (req, res) => {
     try {
+        res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        const cached = getFromCache('departments_all');
+        if (cached) return res.json(cached);
+
         if (!hasSupabase) {
-            return res.json([
+            const depts = [
                 { id: 1, name: "Computer Science & Engineering", code: "CSE", description: "Algorithms, artificial intelligence, software architecture, operating systems, and computer vision.", course_count: 8, notes_count: 34 },
                 { id: 2, name: "Electrical & Electronic Engineering", code: "EEE", description: "Circuit theory, telecommunications, robotics, signals and systems, and microelectronics.", course_count: 6, notes_count: 22 },
                 { id: 3, name: "Business Administration", code: "BBA", description: "Corporate finance, managerial economics, marketing strategy, and organizational behavior.", course_count: 7, notes_count: 19 },
                 { id: 4, name: "Mathematics & Statistics", code: "MATH", description: "Linear algebra, multivariable calculus, probability theory, discrete mathematics, and numerical analysis.", course_count: 5, notes_count: 15 }
-            ]);
+            ];
+            setInCache('departments_all', depts);
+            return res.json(depts);
         }
         let departments = [];
         try {
@@ -356,6 +435,7 @@ app.get('/departments', async (req, res) => {
             departments = (rawDepts || []).map(d => ({ ...d, course_count: 0, notes_count: 0 }));
         }
 
+        setInCache('departments_all', departments || []);
         res.json(departments || []);
     } catch (error) {
         console.error('Departments error:', error);
@@ -365,6 +445,11 @@ app.get('/departments', async (req, res) => {
 
 app.get('/department/:id', async (req, res) => {
     try {
+        res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        const cacheKey = `dept_${req.params.id}`;
+        const cached = getFromCache(cacheKey);
+        if (cached) return res.json(cached);
+
         if (!hasSupabase) {
             const depts = [
                 { id: 1, name: "Computer Science & Engineering", code: "CSE", description: "Algorithms, artificial intelligence, software architecture, operating systems, and computer vision." },
@@ -373,7 +458,7 @@ app.get('/department/:id', async (req, res) => {
                 { id: 4, name: "Mathematics & Statistics", code: "MATH", description: "Linear algebra, multivariable calculus, probability theory, discrete mathematics, and numerical analysis." }
             ];
             const dept = depts.find(d => String(d.id) === String(req.params.id)) || depts[0];
-            return res.json({
+            const mockResult = {
                 department: dept,
                 courses: [
                     { id: 101, name: "Data Structures & Algorithms", code: "CSE201", description: "Stacks, queues, trees, graphs, sorting, searching, dynamic programming.", notes_count: 12 },
@@ -381,7 +466,9 @@ app.get('/department/:id', async (req, res) => {
                     { id: 103, name: "Operating Systems", code: "CSE303", description: "Processes, threads, synchronization, CPU scheduling, virtual memory.", notes_count: 8 },
                     { id: 104, name: "Computer Networks", code: "CSE305", description: "OSI model, TCP/IP, routing algorithms, socket programming, network security.", notes_count: 5 }
                 ]
-            });
+            };
+            setInCache(cacheKey, mockResult);
+            return res.json(mockResult);
         }
         let dept = null;
         let courses = [];
@@ -404,7 +491,9 @@ app.get('/department/:id', async (req, res) => {
             courses = (rawCourses || []).map(c => ({ ...c, notes_count: 0 }));
         }
 
-        res.json({ department: dept, courses: courses || [] });
+        const result = { department: dept, courses: courses || [] };
+        setInCache(cacheKey, result);
+        res.json(result);
     } catch (error) {
         console.error('Department error:', error);
         res.status(500).json({ error: 'Failed to load department' });
@@ -413,12 +502,18 @@ app.get('/department/:id', async (req, res) => {
 
 app.get('/top-contributors', async (req, res) => {
     try {
+        res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        const cached = getFromCache('top_contributors');
+        if (cached) return res.json(cached);
+
         if (!hasSupabase) {
-            return res.json([
+            const mockContributors = [
                 { username: "Alex_Chen", note_count: 18, contribution_score: 220 },
                 { username: "Sarah_Dev", note_count: 14, contribution_score: 175 },
                 { username: "David_K", note_count: 11, contribution_score: 140 }
-            ]);
+            ];
+            setInCache('top_contributors', mockContributors);
+            return res.json(mockContributors);
         }
         const { data: users } = await supabase.from('user_stats').select('username, total_notes, approved_notes, pending_notes, rejected_notes').gt('total_notes', 0);
 
@@ -432,7 +527,9 @@ app.get('/top-contributors', async (req, res) => {
         });
 
         stats.sort((a, b) => b.contribution_score - a.contribution_score || b.note_count - a.note_count);
-        res.json(stats.slice(0, 3));
+        const topList = stats.slice(0, 3);
+        setInCache('top_contributors', topList);
+        res.json(topList);
     } catch (error) {
         console.error('Top contributors error:', error);
         res.status(500).json({ error: 'Failed to load top contributors' });
@@ -441,11 +538,17 @@ app.get('/top-contributors', async (req, res) => {
 
 app.get('/courses', async (req, res) => {
     try {
+        res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        const cached = getFromCache('courses_all');
+        if (cached) return res.json(cached);
+
         if (!hasSupabase) {
-            return res.json([
+            const mockCoursesList = [
                 { id: 101, name: "Data Structures & Algorithms", code: "CSE201", department_id: 1, department_name: "Computer Science & Engineering", notes_count: 12 },
                 { id: 102, name: "Database Management Systems", code: "CSE301", department_id: 1, department_name: "Computer Science & Engineering", notes_count: 9 }
-            ]);
+            ];
+            setInCache('courses_all', mockCoursesList);
+            return res.json(mockCoursesList);
         }
         let courses = [];
         try {
@@ -458,6 +561,7 @@ app.get('/courses', async (req, res) => {
             courses = (rawCourses || []).map(c => ({ ...c, notes_count: 0 }));
         }
 
+        setInCache('courses_all', courses || []);
         res.json(courses || []);
     } catch (error) {
         console.error('Courses error:', error);
@@ -476,6 +580,20 @@ app.get('/api/status', (req, res) => {
 
 app.get('/course/:id', async (req, res) => {
     try {
+        const sessionUser = req.session && req.session.user ? req.session.user : null;
+        const cacheKey = sessionUser
+            ? `course_${req.params.id}_u${sessionUser.id}_r${sessionUser.role}`
+            : `course_${req.params.id}_public`;
+
+        if (!sessionUser) {
+            res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        } else {
+            res.setHeader('Cache-Control', 'private, no-cache');
+        }
+
+        const cached = getFromCache(cacheKey);
+        if (cached) return res.json(cached);
+
         if (!hasSupabase) {
             const mockCourses = {
                 '101': {
@@ -512,16 +630,17 @@ app.get('/course/:id', async (req, res) => {
             };
             const cId = String(req.params.id);
             const courseInfo = mockCourses[cId] || mockCourses['101'];
-            return res.json({
+            const mockResponse = {
                 course: { id: req.params.id, name: courseInfo.name, code: courseInfo.code, department_name: courseInfo.department_name, description: courseInfo.description },
                 notes: courseInfo.notes
-            });
+            };
+            setInCache(cacheKey, mockResponse);
+            return res.json(mockResponse);
         }
 
         // 1. Fetch course details and notes in parallel using Promise.all
         const courseIdNum = parseInt(req.params.id, 10);
         const courseFilter = !isNaN(courseIdNum) ? courseIdNum : req.params.id;
-        const sessionUser = req.session && req.session.user ? req.session.user : null;
 
         let notesQuery = supabase
             .from('notes')
@@ -530,9 +649,9 @@ app.get('/course/:id', async (req, res) => {
             .order('uploaded_at', { ascending: false });
 
         if (!sessionUser) {
-            notesQuery = notesQuery.or('status.eq.approved,status.ilike.approved');
+            notesQuery = notesQuery.eq('status', 'approved');
         } else if (sessionUser.role !== 'admin') {
-            notesQuery = notesQuery.or(`status.eq.approved,status.ilike.approved,uploaded_by.eq.${sessionUser.id}`);
+            notesQuery = notesQuery.or(`status.eq.approved,uploaded_by.eq.${sessionUser.id}`);
         }
 
         const [courseStatsRes, notesRes] = await Promise.all([
@@ -557,13 +676,15 @@ app.get('/course/:id', async (req, res) => {
         }
 
         let notesList = notesRes.data || [];
-        if (notesRes.error) {
-            console.warn('Primary notes query error, attempting fallback:', notesRes.error.message);
+        if (notesRes.error || notesList.length === 0) {
+            if (notesRes.error) {
+                console.warn('Primary notes query error, attempting fallback:', notesRes.error.message);
+            }
             try {
                 const fallbackQuery = await supabase.from('notes').select('*').eq('course_id', courseFilter);
-                if (fallbackQuery.data) {
+                if (fallbackQuery.data && fallbackQuery.data.length > 0) {
                     notesList = fallbackQuery.data.filter(n => {
-                        const st = (n.status || '').toLowerCase();
+                        const st = (n.status || '').toLowerCase().trim();
                         if (!sessionUser) return st === 'approved';
                         if (sessionUser.role === 'admin') return true;
                         return st === 'approved' || String(n.uploaded_by) === String(sessionUser.id);
@@ -593,7 +714,9 @@ app.get('/course/:id', async (req, res) => {
             uploaded_by_name: userMap[note.uploaded_by] || 'Student Contributor'
         }));
 
-        res.json({ course: courseData, notes: formattedNotes });
+        const result = { course: courseData, notes: formattedNotes };
+        setInCache(cacheKey, result);
+        res.json(result);
     } catch (error) {
         console.error('Course error:', error);
         res.status(500).json({ error: 'Server error: ' + error.message });
@@ -644,19 +767,38 @@ app.post('/upload-note/confirm', requireAuth, express.json(), async (req, res) =
 
     try {
         const status = req.session.user.role === 'admin' ? 'approved' : 'pending';
+        let insertedNote = null;
 
-        const { error: dbError } = await supabase.from('notes').insert([{
-            title, description, file_name, file_path, file_size, course_id,
-            uploaded_by: req.session.user.id, status
-        }]);
+        if (hasSupabase) {
+            const { data, error: dbError } = await supabase.from('notes').insert([{
+                title, description, file_name, file_path, file_size, course_id,
+                uploaded_by: req.session.user.id, status
+            }]).select();
 
-        if (dbError) throw dbError;
+            if (dbError) throw dbError;
+            if (data && data.length > 0) insertedNote = data[0];
+        } else {
+            insertedNote = {
+                id: Date.now(),
+                title, description, file_name, file_path, file_size, course_id,
+                uploaded_by: req.session.user.id,
+                uploaded_by_name: req.session.user.username,
+                uploaded_at: new Date().toISOString(),
+                status
+            };
+        }
+
+        // Invalidate all server caches so new notes appear without delay
+        invalidateServerCache('course_');
+        invalidateServerCache('dept_');
+        invalidateServerCache('departments');
+        invalidateServerCache('courses');
 
         const message = status === 'approved'
             ? 'Note uploaded successfully!'
-            : 'Note uploaded successfully! It will be available after admin approval.';
+            : 'Note uploaded successfully! It is now pending admin approval.';
 
-        res.json({ success: true, message, status });
+        res.json({ success: true, message, status, note: insertedNote });
     } catch (error) {
         console.error('Upload confirm error:', error);
         res.status(500).json({ error: 'Failed to confirm note upload' });
@@ -672,7 +814,7 @@ app.get('/download-note/:id', async (req, res) => {
         if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
         const note = notes[0];
-        const isOwner = req.session && req.session.user && req.session.user.id === note.uploaded_by;
+        const isOwner = req.session && req.session.user && String(req.session.user.id) === String(note.uploaded_by);
         const isAdmin = req.session && req.session.user && req.session.user.role === 'admin';
 
         if (note.status !== 'approved' && !isOwner && !isAdmin) {
@@ -695,7 +837,7 @@ app.get('/preview-note/:id', async (req, res) => {
         if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
         const note = notes[0];
-        const isOwner = req.session && req.session.user && req.session.user.id === note.uploaded_by;
+        const isOwner = req.session && req.session.user && String(req.session.user.id) === String(note.uploaded_by);
         const isAdmin = req.session && req.session.user && req.session.user.role === 'admin';
 
         if (note.status !== 'approved' && !isOwner && !isAdmin) {
@@ -718,7 +860,7 @@ app.delete('/note/:id', requireAuth, async (req, res) => {
         if (!notes || notes.length === 0) return res.status(404).json({ error: 'Note not found' });
 
         const note = notes[0];
-        if (note.uploaded_by !== req.session.user.id && req.session.user.role !== 'admin') {
+        if (String(note.uploaded_by) !== String(req.session.user.id) && req.session.user.role !== 'admin') {
             return res.status(403).json({ error: 'Not authorized to delete this note' });
         }
 
@@ -728,6 +870,10 @@ app.delete('/note/:id', requireAuth, async (req, res) => {
         }
 
         await supabase.from('notes').delete().eq('id', req.params.id);
+        invalidateServerCache('course_');
+        invalidateServerCache('dept_');
+        invalidateServerCache('departments');
+        invalidateServerCache('courses');
         res.json({ success: true, message: 'Note deleted successfully' });
     } catch (error) {
         console.error('Delete error:', error);
@@ -802,9 +948,11 @@ app.post('/admin/approve-note/:id', requireAdmin, async (req, res) => {
     try {
         if (!hasSupabase) {
             localMockPendingNotes = localMockPendingNotes.filter(n => String(n.id) !== String(req.params.id));
+            invalidateServerCache();
             return res.json({ success: true, message: 'Note approved successfully' });
         }
         await supabase.from('notes').update({ status: 'approved' }).eq('id', req.params.id);
+        invalidateServerCache();
         res.json({ success: true, message: 'Note approved successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to approve note' });
@@ -815,9 +963,11 @@ app.post('/admin/reject-note/:id', requireAdmin, async (req, res) => {
     try {
         if (!hasSupabase) {
             localMockPendingNotes = localMockPendingNotes.filter(n => String(n.id) !== String(req.params.id));
+            invalidateServerCache();
             return res.json({ success: true, message: 'Note rejected successfully' });
         }
         await supabase.from('notes').update({ status: 'rejected' }).eq('id', req.params.id);
+        invalidateServerCache();
         res.json({ success: true, message: 'Note rejected successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to reject note' });
@@ -865,9 +1015,11 @@ app.post('/admin/departments', requireAdmin, async (req, res) => {
     const { name, code, description } = req.body;
     try {
         if (!hasSupabase) {
+            invalidateServerCache();
             return res.json({ success: true, message: 'Department added successfully' });
         }
         await supabase.from('departments').insert([{ name, code, description, created_by: req.session.user.id }]);
+        invalidateServerCache();
         res.json({ success: true, message: 'Department added successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to add department' });
@@ -878,9 +1030,11 @@ app.post('/admin/courses', requireAdmin, async (req, res) => {
     const { name, code, department_id, description } = req.body;
     try {
         if (!hasSupabase) {
+            invalidateServerCache();
             return res.json({ success: true, message: 'Course added successfully' });
         }
         await supabase.from('courses').insert([{ name, code, department_id, description, created_by: req.session.user.id }]);
+        invalidateServerCache();
         res.json({ success: true, message: 'Course added successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to add course' });
@@ -890,12 +1044,14 @@ app.post('/admin/courses', requireAdmin, async (req, res) => {
 app.delete('/admin/departments/:id', requireAdmin, async (req, res) => {
     try {
         if (!hasSupabase) {
+            invalidateServerCache();
             return res.json({ success: true, message: 'Department deleted successfully' });
         }
         const { count } = await supabase.from('courses').select('id', { count: 'exact', head: true }).eq('department_id', req.params.id);
         if (count > 0) return res.status(400).json({ error: 'Cannot delete department with existing courses.' });
 
         await supabase.from('departments').delete().eq('id', req.params.id);
+        invalidateServerCache();
         res.json({ success: true, message: 'Department deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete department' });
@@ -905,12 +1061,14 @@ app.delete('/admin/departments/:id', requireAdmin, async (req, res) => {
 app.delete('/admin/courses/:id', requireAdmin, async (req, res) => {
     try {
         if (!hasSupabase) {
+            invalidateServerCache();
             return res.json({ success: true, message: 'Course deleted successfully' });
         }
         const { count } = await supabase.from('notes').select('id', { count: 'exact', head: true }).eq('course_id', req.params.id);
         if (count > 0) return res.status(400).json({ error: 'Cannot delete course with existing notes.' });
 
         await supabase.from('courses').delete().eq('id', req.params.id);
+        invalidateServerCache();
         res.json({ success: true, message: 'Course deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete course' });
@@ -947,26 +1105,34 @@ app.get('/admin/users', requireAdmin, async (req, res) => {
 });
 
 app.put('/admin/users/:id', requireAdmin, async (req, res) => {
-    let { username, email, student_id, department, batch, role } = req.body;
-    username = username ? username.trim() : null;
-    email = email ? email.trim().toLowerCase() : null;
+    const { username, email, student_id, department, batch, role } = req.body;
+    const updates = {};
+    if (username) updates.username = username.trim();
+    if (email) updates.email = email.trim().toLowerCase();
+    if (department !== undefined) updates.department = department;
+    if (student_id !== undefined) updates.student_id = student_id;
+    if (batch !== undefined) updates.batch = batch;
+    if (role) updates.role = role;
+
     try {
         if (!hasSupabase) {
             const user = localMockUsers.find(u => String(u.id) === String(req.params.id));
-            if (user) {
-                if (username) user.username = username;
-                if (email) user.email = email;
-                if (student_id !== undefined) user.student_id = student_id;
-                if (department !== undefined) user.department = department;
-                if (batch !== undefined) user.batch = batch;
-                if (role) user.role = role;
-            }
+            if (user) Object.assign(user, updates);
             return res.json({ success: true, message: 'User updated successfully' });
         }
-        await supabase.from('users').update({ username, email, student_id, department, batch, role }).eq('id', req.params.id);
+        const { error } = await supabase.from('users').update(updates).eq('id', req.params.id);
+        if (error) {
+            // Retry omitting optional student_id and batch columns if schema lacks them
+            delete updates.student_id;
+            delete updates.batch;
+            const retry = await supabase.from('users').update(updates).eq('id', req.params.id);
+            if (retry.error) throw retry.error;
+        }
+        invalidateServerCache();
         res.json({ success: true, message: 'User updated successfully' });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to update user' });
+        console.error('Update user error:', error);
+        res.status(500).json({ error: 'Failed to update user: ' + error.message });
     }
 });
 

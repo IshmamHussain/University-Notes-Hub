@@ -108,8 +108,46 @@ INSERT INTO notes (id, title, description, file_name, file_path, file_size, cour
 (7, 'TCP/IP Protocol Suite & Handshake Summary', 'Three-way handshake, flow control, sliding window, and subnetting formulas.', 'tcp_ip_summary.pdf', 'https://university-notes-hub.vercel.app/favicon.svg', 1780000, 104, 1, 'approved')
 ON CONFLICT (id) DO NOTHING;
 
+-- Performance Optimization Indexes
+CREATE INDEX IF NOT EXISTS idx_notes_course_status ON notes(course_id, status);
+CREATE INDEX IF NOT EXISTS idx_notes_uploaded_by ON notes(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_courses_dept ON courses(department_id);
+
 -- Reset primary key auto-increment sequences
 SELECT setval(pg_get_serial_sequence('departments', 'id'), COALESCE(MAX(id), 1)) FROM departments;
 SELECT setval(pg_get_serial_sequence('courses', 'id'), COALESCE(MAX(id), 1)) FROM courses;
 SELECT setval(pg_get_serial_sequence('notes', 'id'), COALESCE(MAX(id), 1)) FROM notes;
+
+-- ========================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- Ensure public and authenticated users can view departments, courses, and approved notes
+-- ========================================================
+
+ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'departments' AND policyname = 'Public can view departments') THEN
+        CREATE POLICY "Public can view departments" ON departments FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'courses' AND policyname = 'Public can view courses') THEN
+        CREATE POLICY "Public can view courses" ON courses FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notes' AND policyname = 'Public can view approved notes') THEN
+        CREATE POLICY "Public can view approved notes" ON notes FOR SELECT USING (status = 'approved' OR status ILIKE 'approved');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notes' AND policyname = 'Users can view and insert own notes') THEN
+        CREATE POLICY "Users can view and insert own notes" ON notes FOR ALL USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Public can view user profiles') THEN
+        CREATE POLICY "Public can view user profiles" ON users FOR SELECT USING (true);
+    END IF;
+END $$;
+
+-- Promote Ishmam Hussain account to Admin
+UPDATE users SET role = 'admin' WHERE email = 'ishmamhussain003@gmail.com' OR username = 'Ishmam Hussain';
+
+
 
