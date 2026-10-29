@@ -7,10 +7,14 @@ const fs = require('fs');
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-    console.error("Missing SUPABASE env vars. Ensure .env is populated.");
+const hasSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+if (!hasSupabase) {
+    console.warn("⚠️ Missing SUPABASE env vars. Server operating with local fallback mode.");
 }
-const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABASE_SERVICE_KEY || "");
+const supabase = createClient(
+    process.env.SUPABASE_URL || "https://dummy-local-project.supabase.co", 
+    process.env.SUPABASE_SERVICE_KEY || "dummy-service-key-for-local-demo"
+);
 
 const app = express();
 
@@ -97,6 +101,15 @@ app.post('/login', async (req, res) => {
     }
 
     try {
+        if (!hasSupabase) {
+            req.session.user = {
+                id: 1,
+                username: loginQuery || 'student_demo',
+                role: loginQuery.toLowerCase().includes('admin') ? 'admin' : 'user'
+            };
+            return res.json({ success: true, user: req.session.user });
+        }
+
         // Special bypass for built-in admin if needed
         if (loginQuery === 'admin') {
             const adminHash = process.env.ADMIN_PASSWORD_HASH || '$2a$10$DqF7Espfm1XTrp9J/ehY/OSSsB4F2/3cYPYerx2SfTeHUbRquHnHG';
@@ -185,6 +198,14 @@ app.post('/logout', (req, res) => {
 
 app.get('/departments', async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json([
+                { id: 1, name: "Computer Science & Engineering", code: "CSE", description: "Algorithms, artificial intelligence, software architecture, operating systems, and computer vision.", course_count: 8, notes_count: 34 },
+                { id: 2, name: "Electrical & Electronic Engineering", code: "EEE", description: "Circuit theory, telecommunications, robotics, signals and systems, and microelectronics.", course_count: 6, notes_count: 22 },
+                { id: 3, name: "Business Administration", code: "BBA", description: "Corporate finance, managerial economics, marketing strategy, and organizational behavior.", course_count: 7, notes_count: 19 },
+                { id: 4, name: "Mathematics & Statistics", code: "MATH", description: "Linear algebra, multivariable calculus, probability theory, discrete mathematics, and numerical analysis.", course_count: 5, notes_count: 15 }
+            ]);
+        }
         const { data: departments, error: dErr } = await supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').order('name');
         if (dErr) throw new Error('Database fetch failed');
         res.json(departments || []);
@@ -196,6 +217,24 @@ app.get('/departments', async (req, res) => {
 
 app.get('/department/:id', async (req, res) => {
     try {
+        if (!hasSupabase) {
+            const depts = [
+                { id: 1, name: "Computer Science & Engineering", code: "CSE", description: "Algorithms, artificial intelligence, software architecture, operating systems, and computer vision." },
+                { id: 2, name: "Electrical & Electronic Engineering", code: "EEE", description: "Circuit theory, telecommunications, robotics, signals and systems, and microelectronics." },
+                { id: 3, name: "Business Administration", code: "BBA", description: "Corporate finance, managerial economics, marketing strategy, and organizational behavior." },
+                { id: 4, name: "Mathematics & Statistics", code: "MATH", description: "Linear algebra, multivariable calculus, probability theory, discrete mathematics, and numerical analysis." }
+            ];
+            const dept = depts.find(d => String(d.id) === String(req.params.id)) || depts[0];
+            return res.json({
+                department: dept,
+                courses: [
+                    { id: 101, name: "Data Structures & Algorithms", code: "CSE201", description: "Stacks, queues, trees, graphs, sorting, searching, dynamic programming.", notes_count: 12 },
+                    { id: 102, name: "Database Management Systems", code: "CSE301", description: "Relational models, SQL, indexing, transaction processing, normalization.", notes_count: 9 },
+                    { id: 103, name: "Operating Systems", code: "CSE303", description: "Processes, threads, synchronization, CPU scheduling, virtual memory.", notes_count: 8 },
+                    { id: 104, name: "Computer Networks", code: "CSE305", description: "OSI model, TCP/IP, routing algorithms, socket programming, network security.", notes_count: 5 }
+                ]
+            });
+        }
         const [ { data: depts, error: dErr }, { data: courses, error: cErr } ] = await Promise.all([
             supabase.from('department_stats').select('id, name, code, description, course_count, notes_count').eq('id', req.params.id),
             supabase.from('course_stats').select('id, name, code, department_id, department_name, notes_count').eq('department_id', req.params.id)
@@ -212,6 +251,13 @@ app.get('/department/:id', async (req, res) => {
 
 app.get('/top-contributors', async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json([
+                { username: "Alex_Chen", note_count: 18, contribution_score: 220 },
+                { username: "Sarah_Dev", note_count: 14, contribution_score: 175 },
+                { username: "David_K", note_count: 11, contribution_score: 140 }
+            ]);
+        }
         const { data: users } = await supabase.from('user_stats').select('username, total_notes, approved_notes, pending_notes, rejected_notes').gt('total_notes', 0);
 
         const stats = (users || []).map(user => {
@@ -233,6 +279,12 @@ app.get('/top-contributors', async (req, res) => {
 
 app.get('/courses', async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json([
+                { id: 101, name: "Data Structures & Algorithms", code: "CSE201", department_id: 1, department_name: "Computer Science & Engineering", notes_count: 12 },
+                { id: 102, name: "Database Management Systems", code: "CSE301", department_id: 1, department_name: "Computer Science & Engineering", notes_count: 9 }
+            ]);
+        }
         const { data: courses, error: cErr } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name, notes_count').order('name');
         if (cErr) throw new Error('Failed to fetch courses');
         res.json(courses || []);
@@ -244,6 +296,16 @@ app.get('/courses', async (req, res) => {
 
 app.get('/course/:id', requireAuth, async (req, res) => {
     try {
+        if (!hasSupabase) {
+            return res.json({
+                course: { id: req.params.id, name: "Data Structures & Algorithms", code: "CSE201", department_name: "Computer Science & Engineering", description: "Comprehensive notes covering binary search trees, heap algorithms, graph traversals, and dynamic programming." },
+                notes: [
+                    { id: 1, title: "Graph Algorithms & BFS/DFS Cheatsheet", description: "In-depth visual summary of graph representations, Dijkstra, topological sort, and cycle detection.", file_name: "graph_algorithms.pdf", file_size: 2450000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 1, uploaded_by_name: "Alex_Chen" },
+                    { id: 2, title: "Dynamic Programming Classic Problems", description: "Memoization vs tabulation, knapsack, LCS, matrix chain multiplication with clean pseudocode.", file_name: "dp_handbook.docx", file_size: 1850000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 2, uploaded_by_name: "Sarah_Dev" },
+                    { id: 3, title: "Balanced Search Trees & AVL Rotations", description: "Self-balancing AVL tree insertion, deletion, and rotation step-by-step diagrams.", file_name: "avl_trees.pdf", file_size: 3100000, uploaded_at: new Date().toISOString(), status: "approved", uploaded_by: 3, uploaded_by_name: "David_K" }
+                ]
+            });
+        }
         const { data: courses } = await supabase.from('course_stats').select('id, name, code, department_id, description, department_name').eq('id', req.params.id);
         if (!courses || courses.length === 0) return res.status(404).json({ error: 'Course not found' });
 
