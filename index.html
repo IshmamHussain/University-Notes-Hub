@@ -430,7 +430,7 @@
 
         /* ── Right: Form Panel ── */
         .auth-form-panel {
-            background: var(--bg-primary);
+            background: #0b0f19; /* Deep dark space background */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -438,29 +438,43 @@
             position: relative;
         }
 
-        [data-theme="dark"] .auth-form-panel {
-            background: #0f172a;
-        }
-
         .auth-card {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.1);
             width: 100%;
             max-width: 440px;
+            padding: 2.5rem;
             position: relative;
         }
 
         .auth-card::before {
-            display: none; /* Remove the old gradient top bar */
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.6), rgba(168, 85, 247, 0.3), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
         }
 
         .auth-header {
             text-align: left;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
+            position: relative;
+            z-index: 1;
         }
 
         .auth-icon {
             width: 56px;
             height: 56px;
-            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            background: linear-gradient(135deg, var(--primary), #a855f7);
             border-radius: 16px;
             display: flex;
             align-items: center;
@@ -468,25 +482,26 @@
             margin: 0 0 1.2rem 0;
             color: white;
             font-size: 1.4rem;
-            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.25);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
         .auth-icon:hover {
             transform: translateY(-2px) scale(1.05);
-            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.35);
+            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.4);
         }
 
         .auth-title {
             font-size: 2rem;
             font-weight: 700;
-            color: var(--text-primary);
+            color: #ffffff;
             margin-bottom: 0.4rem;
             letter-spacing: -0.02em;
         }
 
         .auth-subtitle {
-            color: var(--text-secondary);
+            color: #94a3b8;
             font-size: 0.95rem;
             line-height: 1.5;
         }
@@ -499,7 +514,8 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 500;
-            color: var(--text-primary);
+            color: #e2e8f0;
+            font-size: 0.95rem;
         }
 
         input, textarea, select {
@@ -1552,11 +1568,28 @@
 
         .input-group input {
             padding-left: 42px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .input-group input::placeholder {
+            color: #64748b;
+        }
+
+        .input-group input:focus {
+            background: rgba(15, 23, 42, 0.9);
+            border-color: #818cf8;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), inset 0 2px 4px rgba(0,0,0,0.2);
         }
 
         .input-group input:focus + .input-icon,
         .input-group input:focus ~ .input-icon {
-            color: var(--primary);
+            color: #818cf8;
+            filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.6));
         }
 
         .password-toggle {
@@ -1632,45 +1665,22 @@
         }
 
         .auth-footer a {
-            color: var(--text-secondary);
+            color: #94a3b8;
             text-decoration: none;
             font-size: 0.9rem;
             transition: color 0.3s ease;
         }
 
         .auth-footer a span {
-            color: var(--primary);
+            color: #818cf8;
             font-weight: 600;
         }
 
         .auth-footer a:hover {
-            color: var(--primary);
+            color: #c084fc;
         }
 
-        /* ── Auth Stats Bar ── */
-        .auth-stats {
-            display: flex;
-            gap: 2rem;
-            margin-top: 3rem;
-        }
-
-        .auth-stat-item {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .auth-stat-item strong {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: white;
-        }
-
-        .auth-stat-item span {
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.4);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
+        /* Removed auth stats */
 
         /* ── Auth Responsive ── */
         @media (max-width: 900px) {
@@ -1888,20 +1898,6 @@
                     <p class="auth-brand-tagline">
                         Access thousands of curated notes, collaborate with peers, and excel in your academic journey — all in one place.
                     </p>
-                    <div class="auth-stats">
-                        <div class="auth-stat-item">
-                            <strong>1K+</strong>
-                            <span>Students</span>
-                        </div>
-                        <div class="auth-stat-item">
-                            <strong>500+</strong>
-                            <span>Notes</span>
-                        </div>
-                        <div class="auth-stat-item">
-                            <strong>50+</strong>
-                            <span>Courses</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -1979,20 +1975,6 @@
                     <p class="auth-brand-tagline">
                         Create your student account to start sharing and discovering notes across all departments.
                     </p>
-                    <div class="auth-stats">
-                        <div class="auth-stat-item">
-                            <strong>Free</strong>
-                            <span>Forever</span>
-                        </div>
-                        <div class="auth-stat-item">
-                            <strong>Instant</strong>
-                            <span>Access</span>
-                        </div>
-                        <div class="auth-stat-item">
-                            <strong>Secure</strong>
-                            <span>Platform</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
