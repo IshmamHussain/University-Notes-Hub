@@ -239,67 +239,256 @@
 
         .auth-container {
             min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ── Left: Immersive Brand Panel ── */
+        .auth-brand {
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1040 30%, #302b63 60%, #24243e 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-brand::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 40%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 60%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            animation: meshShift 15s ease-in-out infinite;
+        }
+
+        @keyframes meshShift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(2%, -2%) rotate(1deg); }
+            66% { transform: translate(-1%, 1%) rotate(-0.5deg); }
+        }
+
+        .auth-brand-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .auth-brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 3rem;
+        }
+
+        .auth-brand-logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
+            color: white;
+            font-size: 1.3rem;
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+        }
+
+        .auth-brand-logo span {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .auth-brand h2 {
+            font-size: 3.2rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: white;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+        }
+
+        .auth-brand h2 span {
+            background: linear-gradient(135deg, #818cf8, #c084fc, #60a5fa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .auth-brand-tagline {
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 1.1rem;
+            line-height: 1.7;
+            max-width: 420px;
+        }
+
+        /* Floating academic elements */
+        .auth-floating {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .auth-float-item {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .auth-float-item:nth-child(1) {
+            width: 56px; height: 56px; font-size: 1.3rem;
+            top: 12%; right: 15%;
+            background: rgba(99, 102, 241, 0.15);
+            animation: authFloat1 8s ease-in-out infinite;
+        }
+        .auth-float-item:nth-child(2) {
+            width: 48px; height: 48px; font-size: 1.1rem;
+            top: 30%; right: 8%;
+            background: rgba(139, 92, 246, 0.12);
+            animation: authFloat2 10s ease-in-out infinite;
+        }
+        .auth-float-item:nth-child(3) {
+            width: 44px; height: 44px; font-size: 1rem;
+            bottom: 25%; right: 22%;
+            background: rgba(59, 130, 246, 0.12);
+            animation: authFloat3 9s ease-in-out infinite;
+        }
+        .auth-float-item:nth-child(4) {
+            width: 52px; height: 52px; font-size: 1.2rem;
+            bottom: 12%; left: 10%;
+            background: rgba(168, 85, 247, 0.12);
+            animation: authFloat1 11s ease-in-out infinite reverse;
+        }
+        .auth-float-item:nth-child(5) {
+            width: 40px; height: 40px; font-size: 0.9rem;
+            top: 55%; right: 35%;
+            background: rgba(99, 102, 241, 0.1);
+            animation: authFloat2 7s ease-in-out infinite reverse;
+        }
+        .auth-float-item:nth-child(6) {
+            width: 36px; height: 36px; font-size: 0.85rem;
+            top: 18%; left: 25%;
+            background: rgba(59, 130, 246, 0.1);
+            animation: authFloat3 12s ease-in-out infinite;
+        }
+
+        @keyframes authFloat1 {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(8deg); }
+        }
+        @keyframes authFloat2 {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-15px) translateX(10px); }
+        }
+        @keyframes authFloat3 {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            33% { transform: translateY(-12px) rotate(-5deg); }
+            66% { transform: translateY(8px) rotate(3deg); }
+        }
+
+        /* Decorative grid pattern on left panel */
+        .auth-brand::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 39px,
+                rgba(255, 255, 255, 0.02) 39px,
+                rgba(255, 255, 255, 0.02) 40px
+            ),
+            repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 39px,
+                rgba(255, 255, 255, 0.02) 39px,
+                rgba(255, 255, 255, 0.02) 40px
+            );
+            mask-image: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        /* ── Right: Form Panel ── */
+        .auth-form-panel {
+            background: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            position: relative;
+        }
+
+        [data-theme="dark"] .auth-form-panel {
+            background: #0f172a;
         }
 
         .auth-card {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
             width: 100%;
-            max-width: 450px;
-            padding: 2.5rem;
+            max-width: 440px;
             position: relative;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .auth-card:hover {
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
         }
 
         .auth-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 5px;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
+            display: none; /* Remove the old gradient top bar */
         }
 
         .auth-header {
-            text-align: center;
+            text-align: left;
             margin-bottom: 2rem;
         }
 
         .auth-icon {
-            width: 70px;
-            height: 70px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 1rem;
+            margin: 0 0 1.2rem 0;
             color: white;
-            font-size: 1.8rem;
+            font-size: 1.4rem;
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.25);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .auth-icon:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.35);
         }
 
         .auth-title {
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
+            letter-spacing: -0.02em;
         }
 
         .auth-subtitle {
             color: var(--text-secondary);
-            font-size: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
         }
 
         .form-group {
@@ -1345,6 +1534,199 @@
             animation: pulse 2s infinite;
         }
 
+        /* ── Enhanced Auth Inputs ── */
+        .input-group {
+            position: relative;
+        }
+
+        .input-group .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+            pointer-events: none;
+        }
+
+        .input-group input {
+            padding-left: 42px;
+        }
+
+        .input-group input:focus + .input-icon,
+        .input-group input:focus ~ .input-icon {
+            color: var(--primary);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .password-toggle:hover {
+            color: var(--primary);
+        }
+
+        /* ── Auth Submit Button with shimmer ── */
+        .btn-auth-submit {
+            width: 100%;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-auth-submit::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            animation: authShimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes authShimmer {
+            0% { transform: translateX(-50%); }
+            100% { transform: translateX(50%); }
+        }
+
+        .btn-auth-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.45);
+        }
+
+        .btn-auth-submit:active {
+            transform: translateY(0);
+        }
+
+        /* ── Auth Footer Link ── */
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.8rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .auth-footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .auth-footer a span {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .auth-footer a:hover {
+            color: var(--primary);
+        }
+
+        /* ── Auth Stats Bar ── */
+        .auth-stats {
+            display: flex;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .auth-stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .auth-stat-item strong {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .auth-stat-item span {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        /* ── Auth Responsive ── */
+        @media (max-width: 900px) {
+            .auth-container {
+                grid-template-columns: 1fr;
+            }
+            .auth-brand {
+                display: none;
+            }
+            .auth-form-panel {
+                min-height: 100vh;
+                background: linear-gradient(135deg, #0f0c29 0%, #1a1040 40%, #302b63 100%);
+            }
+            .auth-card {
+                max-width: 420px;
+                background: rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 20px;
+                padding: 2.5rem;
+            }
+            .auth-header {
+                text-align: center;
+            }
+            .auth-icon {
+                margin: 0 auto 1.2rem;
+            }
+            .auth-title {
+                color: white;
+            }
+            .auth-subtitle {
+                color: rgba(255, 255, 255, 0.6);
+            }
+            .form-label {
+                color: rgba(255, 255, 255, 0.8);
+            }
+            .auth-footer a {
+                color: rgba(255, 255, 255, 0.5);
+            }
+            .auth-footer a span {
+                color: #818cf8;
+            }
+            .auth-footer {
+                border-top-color: rgba(255, 255, 255, 0.1);
+            }
+            input {
+                background: rgba(255, 255, 255, 0.06);
+                border-color: rgba(255, 255, 255, 0.12);
+                color: white;
+            }
+            input::placeholder {
+                color: rgba(255, 255, 255, 0.35);
+            }
+        }
+
         @media (max-width: 768px) {
             .navbar {
                 padding: 1rem;
@@ -1485,41 +1867,90 @@
     <!-- Login Page -->
     <div id="loginPage" class="page active">
         <div class="auth-container">
-            <div class="auth-card">
-                <div class="auth-header">
-                    <div class="auth-icon">
-                        <i class="fas fa-graduation-cap"></i>
-                    </div>
-                    <h1 class="auth-title">Welcome Back</h1>
-                    <p class="auth-subtitle">Sign in to your University Notes Hub account</p>
+            <!-- Left: Brand Panel -->
+            <div class="auth-brand">
+                <div class="auth-floating">
+                    <div class="auth-float-item"><i class="fas fa-graduation-cap"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-book-open"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-lightbulb"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-pen-fancy"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-flask"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-atom"></i></div>
                 </div>
+                <div class="auth-brand-content">
+                    <div class="auth-brand-logo">
+                        <div class="auth-brand-logo-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <span>University Notes Hub</span>
+                    </div>
+                    <h2>Share Knowledge,<br><span>Shape Futures</span></h2>
+                    <p class="auth-brand-tagline">
+                        Access thousands of curated notes, collaborate with peers, and excel in your academic journey — all in one place.
+                    </p>
+                    <div class="auth-stats">
+                        <div class="auth-stat-item">
+                            <strong>1K+</strong>
+                            <span>Students</span>
+                        </div>
+                        <div class="auth-stat-item">
+                            <strong>500+</strong>
+                            <span>Notes</span>
+                        </div>
+                        <div class="auth-stat-item">
+                            <strong>50+</strong>
+                            <span>Courses</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label class="form-label">Email or Username</label>
-                        <input type="text" class="form-input" id="username"
-                            placeholder="Enter your university email or admin username" required>
+            <!-- Right: Form Panel -->
+            <div class="auth-form-panel">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <div class="auth-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <h1 class="auth-title">Welcome back</h1>
+                        <p class="auth-subtitle">Sign in to your account to continue learning</p>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-input" id="password" placeholder="Enter your password"
-                            required>
-                    </div>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label class="form-label">Email or Username</label>
+                            <div class="input-group">
+                                <input type="text" class="form-input" id="username"
+                                    placeholder="Enter your email or username" required>
+                                <i class="fas fa-envelope input-icon"></i>
+                            </div>
+                        </div>
 
-                    <div id="loginError" class="message message-error"></div>
+                        <div class="form-group">
+                            <label class="form-label">Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-input" id="password" placeholder="Enter your password"
+                                    required>
+                                <i class="fas fa-lock input-icon"></i>
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
 
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">
-                        <i class="fas fa-sign-in-alt"></i> Sign In
-                    </button>
+                        <div id="loginError" class="message message-error"></div>
 
-                    <div style="text-align: center; margin-top: 1.5rem;">
-                        <a href="#" onclick="showPage('register')"
-                            style="color: var(--primary); text-decoration: none; font-weight: 500;">
-                            Don't have an account? <span style="font-weight: 600;">Create one here</span>
-                        </a>
-                    </div>
-                </form>
+                        <button type="submit" class="btn-auth-submit">
+                            <i class="fas fa-arrow-right"></i> Sign In
+                        </button>
+
+                        <div class="auth-footer">
+                            <a href="#" onclick="showPage('register')">
+                                Don't have an account? <span>Create one</span>
+                            </a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -1527,57 +1958,103 @@
     <!-- Register Page -->
     <div id="registerPage" class="page">
         <div class="auth-container">
-            <div class="auth-card">
-                <div class="auth-header">
-                    <div class="auth-icon">
-                        <i class="fas fa-user-plus"></i>
-                    </div>
-                    <h1 class="auth-title">Create Student Account</h1>
-                    <p class="auth-subtitle">Join University Notes Hub as a student</p>
+            <!-- Left: Brand Panel -->
+            <div class="auth-brand">
+                <div class="auth-floating">
+                    <div class="auth-float-item"><i class="fas fa-graduation-cap"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-book-open"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-lightbulb"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-pen-fancy"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-flask"></i></div>
+                    <div class="auth-float-item"><i class="fas fa-atom"></i></div>
                 </div>
-
-                <form id="registerForm">
-                    <!-- Basic Information -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                        <div class="form-group">
-                            <label class="form-label">Username</label>
-                            <input type="text" class="form-input" id="regUsername" placeholder="Choose a username"
-                                required>
+                <div class="auth-brand-content">
+                    <div class="auth-brand-logo">
+                        <div class="auth-brand-logo-icon">
+                            <i class="fas fa-graduation-cap"></i>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Email Address</label>
-                            <input type="email" class="form-input" id="regEmail" placeholder="Enter university email"
-                                required>
+                        <span>University Notes Hub</span>
+                    </div>
+                    <h2>Join the<br><span>Community</span></h2>
+                    <p class="auth-brand-tagline">
+                        Create your student account to start sharing and discovering notes across all departments.
+                    </p>
+                    <div class="auth-stats">
+                        <div class="auth-stat-item">
+                            <strong>Free</strong>
+                            <span>Forever</span>
+                        </div>
+                        <div class="auth-stat-item">
+                            <strong>Instant</strong>
+                            <span>Access</span>
+                        </div>
+                        <div class="auth-stat-item">
+                            <strong>Secure</strong>
+                            <span>Platform</span>
                         </div>
                     </div>
+                </div>
+            </div>
 
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                        <div class="form-group">
-                            <label class="form-label">Password</label>
-                            <input type="password" class="form-input" id="regPassword" placeholder="Create a password"
-                                required>
+            <!-- Right: Form Panel -->
+            <div class="auth-form-panel">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <div class="auth-icon">
+                            <i class="fas fa-user-plus"></i>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Confirm Password</label>
-                            <input type="password" class="form-input" id="regConfirmPassword"
-                                placeholder="Confirm your password" required>
-                        </div>
+                        <h1 class="auth-title">Create Account</h1>
+                        <p class="auth-subtitle">Join University Notes Hub as a student</p>
                     </div>
 
-                    <div id="registerError" class="message message-error"></div>
+                    <form id="registerForm">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0;">
+                            <div class="form-group">
+                                <label class="form-label">Username</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-input" id="regUsername" placeholder="Choose a username" required>
+                                    <i class="fas fa-user input-icon"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email Address</label>
+                                <div class="input-group">
+                                    <input type="email" class="form-input" id="regEmail" placeholder="University email" required>
+                                    <i class="fas fa-envelope input-icon"></i>
+                                </div>
+                            </div>
+                        </div>
 
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">
-                        <i class="fas fa-user-plus"></i> Create Student Account
-                    </button>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0;">
+                            <div class="form-group">
+                                <label class="form-label">Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-input" id="regPassword" placeholder="Create a password" required>
+                                    <i class="fas fa-lock input-icon"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Confirm Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-input" id="regConfirmPassword" placeholder="Confirm password" required>
+                                    <i class="fas fa-shield-alt input-icon"></i>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div style="text-align: center; margin-top: 1.5rem;">
-                        <a href="#" onclick="showPage('login')"
-                            style="color: var(--primary); text-decoration: none; font-weight: 500;">
-                            Already have an account? <span style="font-weight: 600;">Sign in here</span>
-                        </a>
-                    </div>
-                </form>
+                        <div id="registerError" class="message message-error"></div>
+
+                        <button type="submit" class="btn-auth-submit">
+                            <i class="fas fa-user-plus"></i> Create Student Account
+                        </button>
+
+                        <div class="auth-footer">
+                            <a href="#" onclick="showPage('login')">
+                                Already have an account? <span>Sign in</span>
+                            </a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -1959,6 +2436,18 @@
         let currentUser = null;
         let currentDepartmentId = null;
         let currentCourseId = null;
+
+        function togglePasswordVisibility(inputId, toggleBtn) {
+            const input = document.getElementById(inputId);
+            const icon = toggleBtn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
 
         function toggleTheme() {
             const currentTheme = document.documentElement.getAttribute('data-theme');
