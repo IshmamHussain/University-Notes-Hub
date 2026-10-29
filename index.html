@@ -183,6 +183,16 @@
             display: block;
         }
 
+        /* Prevent flash of login screen when authenticated */
+        html.has-auth #loginPage,
+        html.has-auth #registerPage {
+            display: none !important;
+        }
+
+        html.has-auth .navbar {
+            display: flex;
+        }
+
         /* ── Modern Glassmorphism Navbar ── */
         .navbar {
             background: rgba(10, 10, 14, 0.88);
@@ -2665,6 +2675,17 @@
 </head>
 
 <body>
+    <script>
+        // Synchronous auth check to eliminate login screen glimpse (FOUC)
+        (function () {
+            try {
+                if (localStorage.getItem('mu_user')) {
+                    document.documentElement.classList.add('has-auth');
+                }
+            } catch (e) { }
+        })();
+    </script>
+
     <!-- Navigation -->
     <nav class="navbar" id="navbar">
         <div class="logo" onclick="showPage('dashboard')">
@@ -2690,7 +2711,7 @@
     </nav>
 
     <!-- Login Page -->
-    <div id="loginPage" class="page active">
+    <div id="loginPage" class="page">
         <div class="auth-container">
             <!-- Left: Brand Panel -->
             <div class="auth-brand">
@@ -3240,8 +3261,93 @@
         }
 
         let currentUser = null;
+        try {
+            const savedUser = localStorage.getItem('mu_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+            }
+        } catch (e) {
+            currentUser = null;
+        }
+
         let currentDepartmentId = null;
         let currentCourseId = null;
+        let isNavigating = false;
+
+        function updateNavUser(user) {
+            const userInfo = document.getElementById('userInfo');
+            const adminBtn = document.getElementById('adminBtn');
+            const navbar = document.getElementById('navbar');
+            if (user) {
+                if (userInfo) userInfo.textContent = `Welcome, ${user.username} (${user.role})`;
+                if (adminBtn) adminBtn.style.display = (user.role === 'admin') ? 'flex' : 'none';
+                if (navbar) navbar.style.display = 'flex';
+            } else {
+                if (userInfo) userInfo.textContent = 'Welcome, User';
+                if (adminBtn) adminBtn.style.display = 'none';
+                if (navbar) navbar.style.display = 'none';
+            }
+        }
+
+        function setRoute(route) {
+            sessionStorage.setItem('mu_last_route', route);
+            if (window.location.hash !== '#' + route) {
+                isNavigating = true;
+                window.location.hash = route;
+                setTimeout(() => { isNavigating = false; }, 50);
+            }
+        }
+
+        function handleRoute() {
+            const rawHash = (window.location.hash || '').replace(/^#\/?/, '').trim();
+            const savedRoute = sessionStorage.getItem('mu_last_route');
+            const route = rawHash || savedRoute || (currentUser ? 'dashboard' : 'login');
+
+            if (!currentUser) {
+                if (route === 'register') {
+                    showPage('register', false);
+                } else {
+                    showPage('login', false);
+                }
+                return;
+            }
+
+            // Authenticated user
+            if (route.startsWith('course/')) {
+                const id = route.split('/')[1];
+                if (id) {
+                    const savedDept = sessionStorage.getItem('mu_last_dept');
+                    if (savedDept) currentDepartmentId = parseInt(savedDept, 10);
+                    viewCourse(id, false);
+                    return;
+                }
+            }
+
+            if (route.startsWith('department/')) {
+                const id = route.split('/')[1];
+                if (id) {
+                    viewDepartment(id, false);
+                    return;
+                }
+            }
+
+            if (route === 'admin') {
+                if (currentUser.role === 'admin') {
+                    showPage('admin', false);
+                } else {
+                    showPage('dashboard', true);
+                }
+                return;
+            }
+
+            if (route === 'login' || route === 'register') {
+                showPage('dashboard', true);
+                return;
+            }
+
+            // Default to dashboard
+            showPage('dashboard', false);
+        }
 
         // Client-side high-performance SWR cache store (sessionStorage backed)
         const clientCache = {
@@ -3291,17 +3397,31 @@
             document.documentElement.setAttribute('data-theme', 'dark');
         }
 
-        function showPage(pageId) {
+        function showPage(pageId, updateHash = true) {
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
             });
-            document.getElementById(pageId + 'Page').classList.add('active');
+            const targetPage = document.getElementById(pageId + 'Page');
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
 
             const navbar = document.getElementById('navbar');
             if (pageId === 'login' || pageId === 'register') {
-                navbar.style.display = 'none';
+                if (navbar) navbar.style.display = 'none';
+                if (updateHash) {
+                    setRoute(pageId);
+                }
             } else {
-                navbar.style.display = 'flex';
+                if (navbar) navbar.style.display = 'flex';
+
+                if (updateHash) {
+                    if (pageId === 'dashboard') {
+                        setRoute('dashboard');
+                    } else if (pageId === 'admin') {
+                        setRoute('admin');
+                    }
+                }
 
                 if (pageId === 'dashboard') {
                     loadDashboard();
@@ -3456,15 +3576,11 @@
 
                 if (response.ok) {
                     currentUser = result.user;
+                    localStorage.setItem('mu_user', JSON.stringify(currentUser));
+                    document.documentElement.classList.add('has-auth');
+                    updateNavUser(currentUser);
                     if (typeof clientCache !== 'undefined' && clientCache.clearAll) {
                         clientCache.clearAll();
-                    }
-                    document.getElementById('userInfo').textContent = `Welcome, ${currentUser.username} (${currentUser.role})`;
-
-                    if (currentUser.role === 'admin') {
-                        document.getElementById('adminBtn').style.display = 'flex';
-                    } else {
-                        document.getElementById('adminBtn').style.display = 'none';
                     }
 
                     showPage('dashboard');
@@ -3573,12 +3689,16 @@
 
         function logout() {
             currentUser = null;
+            localStorage.removeItem('mu_user');
+            sessionStorage.removeItem('mu_last_route');
+            sessionStorage.removeItem('mu_last_dept');
+            sessionStorage.removeItem('mu_last_course');
+            document.documentElement.classList.remove('has-auth');
             if (typeof clientCache !== 'undefined' && clientCache.clearAll) {
                 clientCache.clearAll();
             }
             localStorage.removeItem('universityNotesData');
-            const adminBtn = document.getElementById('adminBtn');
-            if (adminBtn) adminBtn.style.display = 'none';
+            updateNavUser(null);
             document.getElementById('loginForm').reset();
             document.getElementById('registerForm').reset();
 
@@ -3692,9 +3812,13 @@
             }
         }
 
-        async function viewDepartment(deptId) {
+        async function viewDepartment(deptId, updateHash = true) {
             currentDepartmentId = deptId;
-            showPage('department');
+            sessionStorage.setItem('mu_last_dept', String(deptId));
+            if (updateHash) {
+                setRoute('department/' + deptId);
+            }
+            showPage('department', false);
 
             // 1. Instant Cache Render (0ms)
             const cached = clientCache.get('dept_' + deptId);
@@ -3790,15 +3914,23 @@
             }
         }
 
-        async function viewCourse(courseId) {
+        async function viewCourse(courseId, updateHash = true) {
             currentCourseId = courseId;
-            showPage('course');
+            sessionStorage.setItem('mu_last_course', String(courseId));
+            if (updateHash) {
+                setRoute('course/' + courseId);
+            }
+            showPage('course', false);
 
             // 1. Instant Cache Render (0ms)
             const cacheKey = 'course_' + courseId + (currentUser ? `_u${currentUser.id}` : '_pub');
             const cached = clientCache.get(cacheKey);
             if (cached && cached.course) {
                 renderCourseUI(cached.course, cached.notes || []);
+                if (cached.course.department_id) {
+                    currentDepartmentId = cached.course.department_id;
+                    sessionStorage.setItem('mu_last_dept', String(cached.course.department_id));
+                }
             } else {
                 document.getElementById('notesContainer').innerHTML = `
                     <div style="text-align: center; padding: 3rem 1rem; color: var(--text-secondary);">
@@ -3817,6 +3949,10 @@
                 if (response.ok && data.course) {
                     clientCache.set(cacheKey, data);
                     renderCourseUI(data.course, data.notes || []);
+                    if (data.course.department_id) {
+                        currentDepartmentId = data.course.department_id;
+                        sessionStorage.setItem('mu_last_dept', String(data.course.department_id));
+                    }
                 } else if (!cached) {
                     throw new Error(data.error || 'Failed to load course details');
                 }
@@ -4821,7 +4957,12 @@
             if (currentDepartmentId) {
                 viewDepartment(currentDepartmentId);
             } else {
-                showPage('dashboard');
+                const savedDept = sessionStorage.getItem('mu_last_dept');
+                if (savedDept) {
+                    viewDepartment(parseInt(savedDept, 10));
+                } else {
+                    showPage('dashboard');
+                }
             }
         }
 
@@ -4844,30 +4985,65 @@
                     const user = (data && data.authenticated && data.user) ? data.user : (data && data.username ? data : null);
                     if (user) {
                         currentUser = user;
-                        document.getElementById('userInfo').textContent = `Welcome, ${user.username} (${user.role})`;
+                        localStorage.setItem('mu_user', JSON.stringify(user));
+                        document.documentElement.classList.add('has-auth');
+                        updateNavUser(currentUser);
 
-                        if (user.role === 'admin') {
-                            document.getElementById('adminBtn').style.display = 'flex';
-                        } else {
-                            document.getElementById('adminBtn').style.display = 'none';
+                        // If user is currently stuck on login or register page, route to destination
+                        const activePage = document.querySelector('.page.active');
+                        if (!activePage || activePage.id === 'loginPage' || activePage.id === 'registerPage') {
+                            handleRoute();
                         }
-
-                        showPage('dashboard');
                     } else {
-                        currentUser = null;
-                        document.getElementById('adminBtn').style.display = 'none';
+                        handleAuthFailure();
                     }
+                } else {
+                    handleAuthFailure();
                 }
             } catch (error) {
-                // Not authenticated, stay on login page
+                // If network is offline, don't boot out if we have valid local session
+                if (!currentUser) {
+                    handleAuthFailure();
+                }
             }
+        }
+
+        function handleAuthFailure() {
+            currentUser = null;
+            localStorage.removeItem('mu_user');
+            sessionStorage.removeItem('mu_last_route');
+            document.documentElement.classList.remove('has-auth');
+            updateNavUser(null);
+            showPage('login');
         }
 
         window.onload = function () {
             localStorage.removeItem('universityNotesData');
             loadTheme();
+
+            // 1. Immediately restore user from localStorage if present
+            try {
+                const saved = localStorage.getItem('mu_user');
+                if (saved) {
+                    currentUser = JSON.parse(saved);
+                    document.documentElement.classList.add('has-auth');
+                    updateNavUser(currentUser);
+                }
+            } catch (e) {
+                console.warn('Failed to parse cached user:', e);
+            }
+
+            // 2. Immediately restore current view route
+            handleRoute();
+
+            // 3. Verify session in background
             checkAuthStatus();
         };
+
+        window.addEventListener('hashchange', function () {
+            if (isNavigating) return;
+            handleRoute();
+        });
 
         function editUser(userId) {
             document.querySelectorAll('.edit-user-form').forEach(form => {
