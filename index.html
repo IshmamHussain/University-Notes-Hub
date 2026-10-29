@@ -118,8 +118,23 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: var(--font-body);
             -webkit-tap-highlight-color: transparent !important;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        button, input, select, textarea {
+            font-family: inherit;
         }
 
         button, .btn, .department-card, .note-card, .stat-card, a, input, select, textarea {
@@ -157,17 +172,6 @@
         ::selection {
             background: rgba(234, 179, 8, 0.3);
             color: #fef08a;
-        }
-
-        body {
-            background: var(--bg-gradient);
-            background-attachment: fixed;
-            min-height: 100vh;
-            color: var(--text-primary);
-            line-height: 1.6;
-            transition: var(--transition);
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
 
         .page {
