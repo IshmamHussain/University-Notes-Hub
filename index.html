@@ -585,12 +585,15 @@
 
         .dashboard-header {
             text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 4rem;
+            animation: slideDown 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
         }
 
         .dashboard-title {
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
             background: linear-gradient(135deg, var(--primary), var(--accent));
             -webkit-background-clip: text;
             background-clip: text;
@@ -610,110 +613,145 @@
             transform: translate(-50%, -50%);
             width: 105%;
             height: 120%;
-            background: rgba(30, 58, 138, 0.1);
+            background: rgba(79, 70, 229, 0.08);
             border-radius: 50px;
             z-index: -1;
+            filter: blur(10px);
         }
 
         [data-theme="dark"] .dashboard-title::before {
-            background: rgba(59, 130, 246, 0.2);
+            background: rgba(99, 102, 241, 0.15);
         }
 
         .dashboard-subtitle {
             font-size: 1.2rem;
+            line-height: 1.5;
             color: var(--text-secondary);
             max-width: 600px;
             margin: 0 auto;
+            letter-spacing: -0.01em;
         }
 
         .stats-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+            animation: slideUpFade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+            animation-delay: 0.1s;
         }
 
         .stat-card {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 1.8rem;
             display: flex;
             align-items: center;
             gap: 1.5rem;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--border-color);
-            transition: var(--transition);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        [data-theme="dark"] .stat-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
         }
 
         .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 20px 40px -15px rgba(79, 70, 229, 0.15);
+        }
+
+        [data-theme="dark"] .stat-card:hover {
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
         }
 
         .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 12px;
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             color: white;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
         }
 
-        .stat-icon-1 {
-            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-        }
-
-        .stat-icon-2 {
-            background: linear-gradient(135deg, #1e40af, #60a5fa);
-        }
-
-        .stat-icon-3 {
-            background: linear-gradient(135deg, #1e3a8a, #93c5fd);
-        }
+        .stat-icon-1 { background: linear-gradient(135deg, #4f46e5, #818cf8); }
+        .stat-icon-2 { background: linear-gradient(135deg, #0ea5e9, #38bdf8); }
+        .stat-icon-3 { background: linear-gradient(135deg, #8b5cf6, #c084fc); }
 
         .stat-info h3 {
-            font-size: 1.8rem;
-            font-weight: 700;
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
             color: var(--text-primary);
+            margin-bottom: 0.2rem;
         }
 
         .stat-info p {
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
 
         .section-title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 2rem;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            animation: slideUpFade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+            animation-delay: 0.2s;
         }
 
         .departments-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2rem;
+            animation: slideUpFade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+            animation-delay: 0.3s;
         }
 
         .department-card {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
             position: relative;
             overflow: hidden;
-            border: 1px solid var(--border-color);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+        }
+
+        [data-theme="dark"] .department-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
         }
 
         .department-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+            transform: translateY(-8px) scale(1.01);
+            box-shadow: 0 25px 50px -15px rgba(79, 70, 229, 0.15);
+        }
+
+        [data-theme="dark"] .department-card:hover {
+            box-shadow: 0 25px 50px -15px rgba(0, 0, 0, 0.5);
         }
 
         .department-card::before {
@@ -722,95 +760,164 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
+            height: 6px;
+            background: linear-gradient(90deg, var(--primary), var(--accent), #8b5cf6);
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+
+        .department-card:hover::before {
+            opacity: 1;
         }
 
         .department-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 1rem;
+            margin-bottom: 1.2rem;
         }
 
         .department-icon {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 12px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(139, 92, 246, 0.1));
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-size: 1.2rem;
+            color: var(--primary);
+            font-size: 1.5rem;
+            border: 1px solid rgba(79, 70, 229, 0.2);
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        [data-theme="dark"] .department-icon {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .department-card:hover .department-icon {
+            transform: scale(1.1) rotate(5deg);
         }
 
         .course-count {
-            background: rgba(30, 58, 138, 0.1);
+            background: rgba(79, 70, 229, 0.1);
             color: var(--primary);
-            padding: 5px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        [data-theme="dark"] .course-count {
+            background: rgba(129, 140, 248, 0.2);
+            color: #a5b4fc;
         }
 
         .department-name {
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-bottom: 0.4rem;
             color: var(--text-primary);
         }
 
         .department-code {
-            color: var(--text-secondary);
+            color: var(--primary);
             font-size: 0.9rem;
-            margin-bottom: 1rem;
+            font-weight: 600;
+            margin-bottom: 1.2rem;
+            background: rgba(79, 70, 229, 0.05);
+            padding: 4px 10px;
+            border-radius: 8px;
+            display: inline-block;
         }
 
         .department-description {
             color: var(--text-secondary);
-            font-size: 0.95rem;
+            font-size: 1rem;
+            line-height: 1.6;
             margin-bottom: 1.5rem;
         }
 
         .course-header {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            padding: 2rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 2rem;
-            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            animation: slideUpFade 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        [data-theme="dark"] .course-header {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(255, 255, 255, 0.05);
         }
 
         .upload-section {
-            background: var(--light);
-            border-radius: var(--radius);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border-left: 4px solid var(--primary);
-            transition: var(--transition);
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-left: 6px solid var(--primary);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        [data-theme="dark"] .upload-section {
+            background: rgba(30, 41, 59, 0.4);
+            border-color: rgba(255, 255, 255, 0.05);
+            border-left-color: var(--primary);
         }
 
         .notes-grid {
             display: grid;
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .note-card {
-            background: var(--card-bg);
-            border-radius: var(--radius);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: var(--shadow);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid var(--border-color);
-            transition: var(--transition);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        [data-theme="dark"] .note-card {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(255, 255, 255, 0.05);
         }
 
         .note-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 15px 30px -10px rgba(79, 70, 229, 0.12);
+        }
+
+        [data-theme="dark"] .note-card:hover {
+            box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.4);
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(40px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         .note-info h4 {
